@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #8ea97a;
+  --color-primary-light: #a9c193;
+  --color-primary-dark: #6e8960;
+  --color-secondary: #555353;
+  --color-section: #f8faf8;
+  --color-muted: #666666;
+  --color-border: #e5e9e3;
+  --color-danger: #c15b4a;
+  --color-warning: #c99a3d;
+  --color-success: #6e8960;
+
+  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-heading: var(--font-jakarta), system-ui, sans-serif;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  color: #222222;
+  background: #f8faf8;
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f8faf8; }
+::-webkit-scrollbar-thumb { background: #8ea97a; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #6e8960; }
+
+::selection {
+  background: rgba(142, 169, 122, 0.3);
+  color: #222222;
+}
+
+:focus-visible {
+  outline: 2px solid #8ea97a;
+  outline-offset: 2px;
+}
+
+a, button {
+  transition-property: color, background-color, border-color,
+                        text-decoration-color, fill, stroke, opacity,
+                        box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(142, 169, 122, 0.18);
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #8ea97a 0%, #a9c193 100%);
+}
