@@ -70,6 +70,7 @@ SENDGRID_WEBHOOK_PUBLIC_KEY=<from SendGrid once you enable Signed Event Webhook 
 SENDGRID_INBOUND_TOKEN=<a random string you make up>
 TELNYX_API_KEY=<once you have Telnyx>
 TELNYX_WEBRTC_CONNECTION_ID=<once you have a Telnyx WebRTC Credential Connection>
+TELNYX_CALL_CONTROL_APP_ID=<a Call Control Application ID, used to bridge inbound calls to the browser>
 TELNYX_PHONE_NUMBER=<once you have Telnyx>
 TELNYX_WEBHOOK_TOKEN=<a random string you make up>
 NEXT_PUBLIC_BASE_URL=https://crm.thinkhawks.com

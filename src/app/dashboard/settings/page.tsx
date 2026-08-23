@@ -12,6 +12,7 @@ const CHECKS = [
   { key: "SENDGRID_INBOUND_TOKEN", label: "SendGrid inbound webhook shared secret (email replies)" },
   { key: "TELNYX_API_KEY", label: "Telnyx API key" },
   { key: "TELNYX_WEBRTC_CONNECTION_ID", label: "Telnyx WebRTC connection ID (browser dialer)" },
+  { key: "TELNYX_CALL_CONTROL_APP_ID", label: "Telnyx Call Control App ID (bridging inbound calls to the browser)" },
   { key: "TELNYX_PHONE_NUMBER", label: "Telnyx phone number (calling + SMS)" },
   { key: "TELNYX_WEBHOOK_TOKEN", label: "Telnyx webhook shared secret" },
   { key: "NEXT_PUBLIC_BASE_URL", label: "Public base URL (for Telnyx/SendGrid callbacks)" },

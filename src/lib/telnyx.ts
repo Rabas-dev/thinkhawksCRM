@@ -7,6 +7,8 @@ export const TELNYX_NUMBER = process.env.TELNYX_PHONE_NUMBER ? toE164(process.en
 export const TELNYX_TEST_NUMBER = process.env.TELNYX_TEST_PHONE_NUMBER ? toE164(process.env.TELNYX_TEST_PHONE_NUMBER) : "";
 /** The WebRTC-enabled Credential Connection every browser session mints its own short-lived Telephony Credential under (see createSessionCredential). */
 export const TELNYX_WEBRTC_CONNECTION_ID = process.env.TELNYX_WEBRTC_CONNECTION_ID || "";
+/** A Call Control Application (not a Credential Connection — POST /calls rejects those) used to originate the second leg when bridging an inbound call to a connected browser session. */
+export const TELNYX_CALL_CONTROL_APP_ID = process.env.TELNYX_CALL_CONTROL_APP_ID || "";
 
 /**
  * Thin wrapper around the Telnyx REST API (Call Control + Messaging +
@@ -149,11 +151,29 @@ export async function mintWebrtcToken(credentialId: string): Promise<string> {
  * which switches Telnyx into Call-Control mode and makes ringing something
  * we have to do explicitly. `sipUsername` is the target session's Telephony
  * Credential sip_username (see createSessionCredential / dialer_sessions).
+ *
+ * `transfer` can't be used here — it only works on a call that's already
+ * answered, and a fresh inbound call is still ringing. The correct pattern
+ * is to dial a second leg to the browser session, then bridge it to the
+ * still-ringing inbound leg; Telnyx handles the answer implicitly once the
+ * browser picks up.
  */
-export async function transferCall(callControlId: string, sipUsername: string) {
-  await telnyxRequest(`/calls/${callControlId}/actions/transfer`, {
+export async function bridgeToSession(inboundCallControlId: string, sipUsername: string) {
+  if (!TELNYX_CALL_CONTROL_APP_ID) throw new Error("TELNYX_CALL_CONTROL_APP_ID is not configured");
+  const dialResult = await telnyxRequest<{ data?: { call_control_id?: string } }>("/calls", {
     method: "POST",
-    body: { to: `sip:${sipUsername}@sip.telnyx.com` },
+    body: {
+      connection_id: TELNYX_CALL_CONTROL_APP_ID,
+      to: `sip:${sipUsername}@sip.telnyx.com`,
+      from: TELNYX_NUMBER || undefined,
+    },
+  });
+  const newLegId = dialResult?.data?.call_control_id;
+  if (!newLegId) throw new Error("Telnyx didn't return a call_control_id for the dialed leg");
+
+  await telnyxRequest(`/calls/${inboundCallControlId}/actions/bridge`, {
+    method: "POST",
+    body: { call_control_id: newLegId },
   });
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireWebhookToken, decodeClientState, startRecording, transferCall } from "@/lib/telnyx";
+import { requireWebhookToken, decodeClientState, startRecording, bridgeToSession } from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CallStatus } from "@/lib/types";
 
@@ -31,10 +31,10 @@ function mapHangupStatus(cause: string | undefined): CallStatus {
  * Inbound: a webhook attached to a Credential Connection puts it in
  * Call-Control mode for that call — Telnyx does *not* auto-ring registered
  * WebRTC clients in that mode (only connections with no webhook get that
- * native behavior), so call.initiated below explicitly transfers the call to
- * whichever browser dialer session connected most recently (dialer_sessions,
- * populated by /api/calls/token). If nobody's connected, the call just rings
- * out — there's no fallback destination configured.
+ * native behavior), so call.initiated below explicitly dials and bridges the
+ * call to whichever browser dialer session connected most recently
+ * (dialer_sessions, populated by /api/calls/token). If nobody's connected,
+ * the call just rings out — there's no fallback destination configured.
  */
 export async function POST(request: NextRequest) {
   if (!requireWebhookToken(request.nextUrl)) {
@@ -90,19 +90,19 @@ export async function POST(request: NextRequest) {
 
         if (session?.sip_username) {
           try {
-            await transferCall(payload.call_control_id as string, session.sip_username);
+            await bridgeToSession(payload.call_control_id as string, session.sip_username);
           } catch (err) {
             // Debugging aid — this route runs on a host we can't tail logs on,
             // so the failure reason goes straight on the call record instead.
             if (insertedCall) {
               await supabase
                 .from("calls")
-                .update({ notes: `transfer failed: ${err instanceof Error ? err.message : String(err)}` })
+                .update({ notes: `bridge failed: ${err instanceof Error ? err.message : String(err)}` })
                 .eq("id", insertedCall.id);
             }
           }
         } else if (insertedCall) {
-          await supabase.from("calls").update({ notes: "transfer skipped: no dialer_sessions row" }).eq("id", insertedCall.id);
+          await supabase.from("calls").update({ notes: "bridge skipped: no dialer_sessions row" }).eq("id", insertedCall.id);
         }
         break;
       }
