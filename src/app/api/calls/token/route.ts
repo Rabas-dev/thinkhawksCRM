@@ -12,7 +12,9 @@ import {
  * Mints a short-lived WebRTC login token for the browser softphone
  * (src/lib/dialer-context.tsx). Each call creates a brand-new Telephony
  * Credential scoped to this one dialer session — see createSessionCredential
- * for why a shared static credential breaks multi-tab/multi-agent use.
+ * for why a shared static credential breaks multi-tab/multi-agent use. The
+ * session is also recorded in `dialer_sessions` so the inbound voice webhook
+ * knows which SIP address to ring (see transferCall).
  */
 export async function GET() {
   const supabase = await createClient();
@@ -22,8 +24,13 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const credentialId = await createSessionCredential(`dialer-session:${user.email ?? user.id}:${Date.now()}`);
+    const { id: credentialId, sipUsername } = await createSessionCredential(
+      `dialer-session:${user.email ?? user.id}:${Date.now()}`,
+    );
     const token = await mintWebrtcToken(credentialId);
+    await supabase
+      .from("dialer_sessions")
+      .insert({ credential_id: credentialId, sip_username: sipUsername, user_email: user.email ?? null });
     return NextResponse.json({
       token,
       credentialId,
@@ -56,6 +63,8 @@ export async function DELETE(request: NextRequest) {
   if (!credentialId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentialId)) {
     return NextResponse.json({ error: "Invalid credentialId" }, { status: 400 });
   }
+
+  await supabase.from("dialer_sessions").delete().eq("credential_id", credentialId);
 
   try {
     await deleteSessionCredential(credentialId);

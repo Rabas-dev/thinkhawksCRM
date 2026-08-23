@@ -99,15 +99,16 @@ export function decodeClientState(raw: unknown): Record<string, unknown> | null 
  * deleting it on disconnect (see DELETE /api/calls/token) is Telnyx's own
  * recommended pattern for multi-session WebRTC apps.
  */
-export async function createSessionCredential(name: string): Promise<string> {
+export async function createSessionCredential(name: string): Promise<{ id: string; sipUsername: string }> {
   if (!TELNYX_WEBRTC_CONNECTION_ID) throw new Error("TELNYX_WEBRTC_CONNECTION_ID is not configured");
-  const result = await telnyxRequest<{ data?: { id?: string } }>("/telephony_credentials", {
+  const result = await telnyxRequest<{ data?: { id?: string; sip_username?: string } }>("/telephony_credentials", {
     method: "POST",
     body: { connection_id: TELNYX_WEBRTC_CONNECTION_ID, name },
   });
   const id = result?.data?.id;
-  if (!id) throw new Error("Telnyx didn't return a credential id");
-  return id;
+  const sipUsername = result?.data?.sip_username;
+  if (!id || !sipUsername) throw new Error("Telnyx didn't return a credential id/sip_username");
+  return { id, sipUsername };
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -139,6 +140,21 @@ export async function mintWebrtcToken(credentialId: string): Promise<string> {
   const token = result?.data ?? result?.token;
   if (!token) throw new Error("Telnyx didn't return a token");
   return token;
+}
+
+/**
+ * Rings a currently-connected browser dialer session for an inbound call.
+ * Credential Connections only auto-ring registered WebRTC clients when
+ * *no* webhook is attached — ours needs one for call logging/recording,
+ * which switches Telnyx into Call-Control mode and makes ringing something
+ * we have to do explicitly. `sipUsername` is the target session's Telephony
+ * Credential sip_username (see createSessionCredential / dialer_sessions).
+ */
+export async function transferCall(callControlId: string, sipUsername: string) {
+  await telnyxRequest(`/calls/${callControlId}/actions/transfer`, {
+    method: "POST",
+    body: { to: `sip:${sipUsername}@sip.telnyx.com` },
+  });
 }
 
 /** Starts recording a call, dual channel so agent + contact are separable. */

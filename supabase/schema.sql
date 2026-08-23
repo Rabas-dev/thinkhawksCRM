@@ -88,6 +88,26 @@ drop index if exists calls_sid_idx;
 create index if not exists calls_contact_idx on calls (contact_id, created_at desc);
 create unique index if not exists calls_session_idx on calls (telnyx_call_session_id);
 
+-- Tracks which browser dialer sessions are currently connected to Telnyx, so
+-- the inbound voice webhook (Call Control mode, since it has a webhook
+-- attached) knows which SIP address to transfer an inbound call to — Telnyx
+-- only auto-rings registered WebRTC clients on connections with *no*
+-- webhook; once one's attached (needed for call logging/recording), ringing
+-- has to be done explicitly. Row is created on dialer connect
+-- (GET /api/calls/token) and removed on disconnect (DELETE /api/calls/token).
+create table if not exists dialer_sessions (
+  id uuid primary key default gen_random_uuid(),
+  credential_id text not null unique,
+  sip_username text not null,
+  user_email text,
+  created_at timestamptz not null default now()
+);
+
+alter table dialer_sessions enable row level security;
+drop policy if exists "authenticated full access" on dialer_sessions;
+create policy "authenticated full access" on dialer_sessions
+  for all to authenticated using (true) with check (true);
+
 -- ─── Messaging (Telnyx SMS) ──────────────────────────────────────────────────
 -- WhatsApp isn't wired up in this pass — it needs its own Meta Business
 -- verification through Telnyx and can be added later as a separate piece of

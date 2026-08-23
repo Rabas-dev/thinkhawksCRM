@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireWebhookToken, decodeClientState, startRecording } from "@/lib/telnyx";
+import { requireWebhookToken, decodeClientState, startRecording, transferCall } from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CallStatus } from "@/lib/types";
 
@@ -21,16 +21,20 @@ function mapHangupStatus(cause: string | undefined): CallStatus {
 /**
  * Single webhook URL for every Call Control event, configured once on the
  * Telnyx Credential Connection behind the browser softphone
- * (src/lib/dialer-context.tsx). Since the WebRTC leg *is* the agent's side of
- * the call, there's only ever one Call Control leg per call here — no manual
- * dial()/bridge() the way a ring-your-phone-first flow needs.
+ * (src/lib/dialer-context.tsx).
  *
  * Outbound: the browser first POSTs to /api/calls/start to pre-create a
  * `calls` row, then originates the Telnyx call itself with that row's id as
  * `clientState` — call.initiated below reads it back to attach Telnyx's ids
- * to the right row. Inbound: someone calls the Telnyx number, which the
- * portal routes straight to the Credential Connection, ringing whichever
- * browser softphones are currently connected — call.initiated logs it fresh.
+ * to the right row.
+ *
+ * Inbound: a webhook attached to a Credential Connection puts it in
+ * Call-Control mode for that call — Telnyx does *not* auto-ring registered
+ * WebRTC clients in that mode (only connections with no webhook get that
+ * native behavior), so call.initiated below explicitly transfers the call to
+ * whichever browser dialer session connected most recently (dialer_sessions,
+ * populated by /api/calls/token). If nobody's connected, the call just rings
+ * out — there's no fallback destination configured.
  */
 export async function POST(request: NextRequest) {
   if (!requireWebhookToken(request.nextUrl)) {
@@ -72,6 +76,22 @@ export async function POST(request: NextRequest) {
           status: "ringing",
           contact_phone: from,
         });
+
+        const { data: session } = await supabase
+          .from("dialer_sessions")
+          .select("sip_username")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (session?.sip_username) {
+          try {
+            await transferCall(payload.call_control_id as string, session.sip_username);
+          } catch {
+            // If the transfer fails (e.g. the session died without cleaning up its
+            // row) the call just rings out — nothing else to fall back to.
+          }
+        }
         break;
       }
 
