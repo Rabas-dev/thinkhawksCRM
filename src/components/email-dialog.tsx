@@ -75,7 +75,7 @@ export function EmailDialog({
             <select
               onChange={(e) => applyTemplate(e.target.value)}
               defaultValue=""
-              className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Write from scratch</option>
               {templates.map((t) => (

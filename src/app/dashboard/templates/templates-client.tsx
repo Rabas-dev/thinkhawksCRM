@@ -32,9 +32,9 @@ export function TemplatesClient({ initialTemplates }: { initialTemplates: EmailT
           <h1 className="text-2xl font-semibold text-secondary">Email templates</h1>
           <p className="mt-1 text-sm text-muted">
             Reusable copy for one-off emails and campaigns. Use{" "}
-            <code className="rounded bg-black/5 px-1 py-0.5 text-xs">{"{{first_name}}"}</code>,{" "}
-            <code className="rounded bg-black/5 px-1 py-0.5 text-xs">{"{{full_name}}"}</code>, or{" "}
-            <code className="rounded bg-black/5 px-1 py-0.5 text-xs">{"{{company}}"}</code> to
+            <code className="rounded bg-ink/5 px-1 py-0.5 text-xs">{"{{first_name}}"}</code>,{" "}
+            <code className="rounded bg-ink/5 px-1 py-0.5 text-xs">{"{{full_name}}"}</code>, or{" "}
+            <code className="rounded bg-ink/5 px-1 py-0.5 text-xs">{"{{company}}"}</code> to
             personalize.
           </p>
         </div>
@@ -58,7 +58,7 @@ export function TemplatesClient({ initialTemplates }: { initialTemplates: EmailT
                 <FileText size={15} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[#222]">{t.name}</p>
+                <p className="truncate text-sm font-medium text-ink">{t.name}</p>
                 <p className="truncate text-xs text-muted">{t.subject}</p>
               </div>
               <button

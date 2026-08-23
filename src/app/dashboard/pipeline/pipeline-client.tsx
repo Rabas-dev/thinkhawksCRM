@@ -4,9 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { Phone, Mail, Building2 } from "lucide-react";
 import { Card, Badge } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
 import { EmailDialog } from "@/components/email-dialog";
 import { useDialer } from "@/lib/dialer-context";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import type { Contact, PipelineStage } from "@/lib/types";
 
@@ -61,7 +62,7 @@ export function PipelineClient({ initialContacts }: { initialContacts: Contact[]
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{col.label}</h2>
                 <Badge tone="muted">{inStage.length}</Badge>
               </div>
-              <div className="min-h-[120px] space-y-2 rounded-xl bg-black/[0.03] p-2">
+              <div className="min-h-[120px] space-y-2 rounded-xl bg-ink/[0.03] p-2">
                 {inStage.map((c) => (
                   <Card
                     key={c.id}
@@ -73,12 +74,10 @@ export function PipelineClient({ initialContacts }: { initialContacts: Contact[]
                     )}
                   >
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary-dark">
-                        {initials(c.full_name)}
-                      </div>
+                      <Avatar name={c.full_name} size={28} />
                       <Link
                         href={`/dashboard/contacts/${c.id}`}
-                        className="min-w-0 flex-1 truncate text-sm font-medium text-[#222] hover:underline"
+                        className="min-w-0 flex-1 truncate text-sm font-medium text-ink hover:underline"
                       >
                         {c.full_name}
                       </Link>

@@ -8,15 +8,31 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const sid = request.nextUrl.searchParams.get("sid");
-  if (sid) {
+  const id = request.nextUrl.searchParams.get("id");
+  if (id) {
     const { data, error } = await supabase
       .from("calls")
       .select("*, contacts(id, full_name)")
-      .eq("twilio_call_sid", sid)
+      .eq("id", id)
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ call: data });
+  }
+
+  // Polled by the dialer to screen-pop inbound calls the moment they start
+  // ringing — since the browser has no persistent connection to Telnyx.
+  const inboundSince = request.nextUrl.searchParams.get("inbound_since");
+  if (inboundSince) {
+    const { data, error } = await supabase
+      .from("calls")
+      .select("*, contacts(id, full_name)")
+      .eq("direction", "inbound")
+      .eq("status", "ringing")
+      .gt("created_at", inboundSince)
+      .order("created_at", { ascending: false })
+      .limit(5);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ calls: data });
   }
 
   const contactId = request.nextUrl.searchParams.get("contact_id");

@@ -6,9 +6,9 @@ type Size = "sm" | "md" | "icon";
 
 const variants: Record<Variant, string> = {
   primary: "bg-primary text-white hover:bg-primary-dark shadow-sm",
-  secondary: "bg-secondary text-white hover:bg-[#3f3d3d]",
-  outline: "border border-border bg-white text-[#222] hover:bg-section",
-  ghost: "text-[#222] hover:bg-black/5",
+  secondary: "bg-chrome text-white hover:bg-[#3f3d3d]",
+  outline: "border border-border bg-surface text-ink hover:bg-section",
+  ghost: "text-ink hover:bg-ink/5",
   danger: "bg-danger text-white hover:opacity-90",
 };
 

@@ -68,14 +68,10 @@ SENDGRID_API_KEY=<your sendgrid key>
 SENDGRID_FROM_EMAIL=crm@thinkhawks.com
 SENDGRID_WEBHOOK_PUBLIC_KEY=<from SendGrid once you enable Signed Event Webhook Requests>
 SENDGRID_INBOUND_TOKEN=<a random string you make up>
-TWILIO_ACCOUNT_SID=<once you have Twilio>
-TWILIO_AUTH_TOKEN=<once you have Twilio>
-TWILIO_PHONE_NUMBER=<once you have Twilio>
-TWILIO_WHATSAPP_NUMBER=<optional>
-TWILIO_WEBHOOK_TOKEN=<a random string you make up>
-TWILIO_API_KEY_SID=<once you have a Twilio API key — for the browser dialer>
-TWILIO_API_KEY_SECRET=<once you have a Twilio API key — for the browser dialer>
-TWILIO_TWIML_APP_SID=<once you have a Twilio TwiML App — for the browser dialer>
+TELNYX_API_KEY=<once you have Telnyx>
+TELNYX_WEBRTC_CONNECTION_ID=<once you have a Telnyx WebRTC Credential Connection>
+TELNYX_PHONE_NUMBER=<once you have Telnyx>
+TELNYX_WEBHOOK_TOKEN=<a random string you make up>
 NEXT_PUBLIC_BASE_URL=https://crm.thinkhawks.com
 ```
 
@@ -87,10 +83,10 @@ Back on the Node.js app's hPanel page, click **Restart**. Visit
 `https://crm.thinkhawks.com` — you should see the login page. If it errors,
 check the app's **Logs** tab in hPanel first.
 
-## 7. Point Resend and Twilio at the real domain
+## 7. Point SendGrid and Telnyx at the real domain
 
-Now that `NEXT_PUBLIC_BASE_URL` is a real HTTPS URL, go back to the Resend
-webhook setup and the Twilio webhook setup in `SETUP.md` and use
+Now that `NEXT_PUBLIC_BASE_URL` is a real HTTPS URL, go back to the SendGrid
+webhook setup and the Telnyx webhook setup in `SETUP.md` and use
 `https://crm.thinkhawks.com/...` as the endpoint URLs instead of an ngrok
 tunnel.
 
@@ -114,7 +110,7 @@ app in hPanel.
 
 Passenger-based apps on shared hosting sleep after a period of no traffic
 and wake on the next request, adding a few seconds of delay to that first
-request. For the dashboard UI this is barely noticeable. For Twilio's
+request. For the dashboard UI this is barely noticeable. For Telnyx's
 webhooks (call status, recordings, inbound messages) it means the very
 first callback after idle time might time out. If that turns out to bite in
 practice, the fix is either enabling any "always on" option Hostinger

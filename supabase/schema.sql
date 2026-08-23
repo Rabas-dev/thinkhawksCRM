@@ -49,31 +49,55 @@ create table if not exists email_events (
 create index if not exists email_events_contact_idx on email_events (contact_id);
 create index if not exists email_events_resend_id_idx on email_events (resend_email_id);
 
--- ─── Calling + recording (Twilio Voice) ─────────────────────────────────────
+-- ─── Calling + recording (Telnyx Call Control) ──────────────────────────────
 
 create table if not exists calls (
   id uuid primary key default gen_random_uuid(),
   contact_id uuid references contacts (id) on delete set null,
-  twilio_call_sid text unique,
+  telnyx_call_control_id text,
+  telnyx_call_session_id text unique,
   direction text not null default 'outbound' check (direction in ('outbound', 'inbound')),
   status text not null default 'initiated',
   agent_phone text,
   contact_phone text,
   duration_seconds int,
+  started_at timestamptz,
   recording_url text,
-  recording_sid text,
+  recording_id text,
   created_at timestamptz not null default now()
 );
 
-create index if not exists calls_contact_idx on calls (contact_id, created_at desc);
-create index if not exists calls_sid_idx on calls (twilio_call_sid);
+-- Twilio → Telnyx migration for a project that already has the old columns
+-- (create table if not exists is a no-op on an existing table, so this is
+-- what actually moves data on a re-run against a live database).
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'calls' and column_name = 'twilio_call_sid') then
+    alter table calls drop constraint if exists calls_twilio_call_sid_key;
+    alter table calls rename column twilio_call_sid to telnyx_call_control_id;
+  end if;
+  if exists (select 1 from information_schema.columns where table_name = 'calls' and column_name = 'recording_sid') then
+    alter table calls rename column recording_sid to recording_id;
+  end if;
+end $$;
 
--- ─── Messaging (Twilio SMS / WhatsApp) ──────────────────────────────────────
+alter table calls add column if not exists telnyx_call_session_id text;
+alter table calls add column if not exists started_at timestamptz;
+
+drop index if exists calls_sid_idx;
+create index if not exists calls_contact_idx on calls (contact_id, created_at desc);
+create unique index if not exists calls_session_idx on calls (telnyx_call_session_id);
+
+-- ─── Messaging (Telnyx SMS) ──────────────────────────────────────────────────
+-- WhatsApp isn't wired up in this pass — it needs its own Meta Business
+-- verification through Telnyx and can be added later as a separate piece of
+-- work. The 'whatsapp' channel value is kept in the check constraint so
+-- historical rows (from before this migration) stay valid.
 
 create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   contact_id uuid references contacts (id) on delete set null,
-  twilio_message_sid text unique,
+  telnyx_message_id text unique,
   direction text not null check (direction in ('outbound', 'inbound')),
   channel text not null default 'sms' check (channel in ('sms', 'whatsapp')),
   body text,
@@ -81,8 +105,18 @@ create table if not exists messages (
   created_at timestamptz not null default now()
 );
 
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_name = 'messages' and column_name = 'twilio_message_sid') then
+    alter table messages drop constraint if exists messages_twilio_message_sid_key;
+    alter table messages rename column twilio_message_sid to telnyx_message_id;
+    alter table messages add constraint messages_telnyx_message_id_key unique (telnyx_message_id);
+  end if;
+end $$;
+
+drop index if exists messages_sid_idx;
 create index if not exists messages_contact_idx on messages (contact_id, created_at);
-create index if not exists messages_sid_idx on messages (twilio_message_sid);
+create index if not exists messages_sid_idx on messages (telnyx_message_id);
 
 -- ─── Email marketing (templates + campaigns) ────────────────────────────────
 
@@ -258,7 +292,7 @@ create trigger meetings_set_updated_at
 
 -- ─── Row Level Security ──────────────────────────────────────────────────────
 -- Single-tenant agency tool: any signed-in (authenticated) team member has full
--- access. Webhooks (Twilio/Resend) write through the service-role key, which
+-- access. Webhooks (Telnyx/SendGrid) write through the service-role key, which
 -- bypasses RLS entirely, so they don't need their own policy.
 
 alter table contacts enable row level security;

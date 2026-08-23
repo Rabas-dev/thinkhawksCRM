@@ -143,7 +143,7 @@ export function CalendarClient({ meetings, contacts }: { meetings: MeetingRow[];
                     <span
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full text-xs",
-                        isToday(day) ? "bg-primary text-white font-semibold" : "text-[#222]",
+                        isToday(day) ? "bg-primary text-white font-semibold" : "text-ink",
                       )}
                     >
                       {format(day, "d")}
@@ -236,7 +236,7 @@ function MeetingCard({
     <Card className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-[#222]">{meeting.title}</p>
+          <p className="truncate text-sm font-medium text-ink">{meeting.title}</p>
           <Link href={`/dashboard/contacts/${meeting.contact_id}`} className="truncate text-xs text-primary-dark hover:underline">
             {contact?.full_name ?? "Unknown contact"}
           </Link>

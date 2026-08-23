@@ -100,7 +100,7 @@ export default function NewCampaignPage() {
             <select
               value={templateId}
               onChange={(e) => applyTemplate(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Write from scratch</option>
               {templates.map((t) => (
@@ -115,7 +115,7 @@ export default function NewCampaignPage() {
             <select
               value={segmentTag}
               onChange={(e) => setSegmentTag(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">All contacts with email</option>
               {tags.map((t) => (
@@ -135,9 +135,9 @@ export default function NewCampaignPage() {
           <Label>Body</Label>
           <Textarea required rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
           <p className="mt-1 text-xs text-muted">
-            Personalize with <code className="rounded bg-black/5 px-1 py-0.5">{"{{first_name}}"}</code>,{" "}
-            <code className="rounded bg-black/5 px-1 py-0.5">{"{{full_name}}"}</code>, or{" "}
-            <code className="rounded bg-black/5 px-1 py-0.5">{"{{company}}"}</code>.
+            Personalize with <code className="rounded bg-ink/5 px-1 py-0.5">{"{{first_name}}"}</code>,{" "}
+            <code className="rounded bg-ink/5 px-1 py-0.5">{"{{full_name}}"}</code>, or{" "}
+            <code className="rounded bg-ink/5 px-1 py-0.5">{"{{company}}"}</code>.
           </p>
         </div>
 

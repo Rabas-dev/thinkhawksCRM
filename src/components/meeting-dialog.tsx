@@ -106,7 +106,7 @@ export function MeetingDialog({
               required
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="" disabled>
                 Select a contact…
@@ -151,7 +151,7 @@ export function MeetingDialog({
             <select
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {[15, 30, 45, 60, 90].map((m) => (
                 <option key={m} value={m}>

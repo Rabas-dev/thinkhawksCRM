@@ -41,11 +41,11 @@ export function FollowUpsList({ tasks }: { tasks: FollowUpTask[] }) {
           const overdue = isPast(new Date(t.due_at));
           return (
             <div key={t.id} className="flex items-center gap-3 px-5 py-3">
-              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/5 text-secondary">
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink/5 text-secondary">
                 <CalendarClock size={14} />
               </div>
               <Link href={`/dashboard/contacts/${t.contact_id}`} className="min-w-0 flex-1 hover:underline">
-                <p className="truncate text-sm text-[#222]">
+                <p className="truncate text-sm text-ink">
                   <span className="font-medium">{contact?.full_name ?? "Unknown contact"}</span>{" "}
                   <span className="text-muted">— {t.title}</span>
                 </p>

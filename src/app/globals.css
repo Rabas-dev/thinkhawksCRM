@@ -1,25 +1,57 @@
 @import "tailwindcss";
 
+/* Enables `dark:` variants whenever an ancestor (normally <html>) carries a
+   .dark class — toggled by src/lib/theme-context.tsx. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary: #8ea97a;
   --color-primary-light: #a9c193;
   --color-primary-dark: #6e8960;
+  /* Body/label text tone — flips between dark-on-light and light-on-dark. */
   --color-secondary: #555353;
+  /* App shell background (sidebar rail, dial pad keys, subtle panels). */
   --color-section: #f8faf8;
   --color-muted: #666666;
   --color-border: #e5e9e3;
   --color-danger: #c15b4a;
   --color-warning: #c99a3d;
   --color-success: #6e8960;
+  /* Card/input/dropdown surfaces — was a literal `bg-white` everywhere. */
+  --color-surface: #ffffff;
+  /* Primary/strong text — was a literal `text-[#222]` everywhere. */
+  --color-ink: #222222;
+  /* Fixed dark chrome bars (dialer header, secondary buttons) that stay dark
+     in both themes — kept separate from --color-secondary so that token is
+     free to flip for body text without breaking these two backgrounds. */
+  --color-chrome: #555353;
 
   --font-sans: var(--font-jakarta), system-ui, sans-serif;
   --font-heading: var(--font-jakarta), system-ui, sans-serif;
 
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2rem;
+  /* Tightened from the original (0.5/0.75/1/1.5/2rem) scale — the old values
+     read as consumer-app-soft for a CRM agents use all day; this lands
+     closer to Linear/Salesforce's denser, more technical corner radii. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+}
+
+.dark {
+  --color-primary: #93b47e;
+  --color-primary-light: #a9c193;
+  --color-primary-dark: #729862;
+  --color-secondary: #c7cbc0;
+  --color-section: #16180f;
+  --color-muted: #93998b;
+  --color-border: #2e3227;
+  --color-danger: #d97a68;
+  --color-warning: #d9ac53;
+  --color-success: #8ea97a;
+  --color-surface: #1e2118;
+  --color-ink: #f2f4ee;
 }
 
 html {
@@ -28,8 +60,8 @@ html {
 }
 
 body {
-  color: #222222;
-  background: #f8faf8;
+  color: var(--color-ink);
+  background: var(--color-section);
   font-family: var(--font-jakarta), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -40,13 +72,13 @@ h1, h2, h3 {
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #f8faf8; }
-::-webkit-scrollbar-thumb { background: #8ea97a; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #6e8960; }
+::-webkit-scrollbar-track { background: var(--color-section); }
+::-webkit-scrollbar-thumb { background: var(--color-primary); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary-dark); }
 
 ::selection {
   background: rgba(142, 169, 122, 0.3);
-  color: #222222;
+  color: var(--color-ink);
 }
 
 :focus-visible {
@@ -66,6 +98,11 @@ a, button {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(142, 169, 122, 0.18);
+}
+
+.dark .glass {
+  background: rgba(30, 33, 24, 0.85);
   border: 1px solid rgba(142, 169, 122, 0.18);
 }
 

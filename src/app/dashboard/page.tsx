@@ -95,11 +95,11 @@ export default async function DashboardPage() {
                   href={`/dashboard/contacts/${a.contact_id}`}
                   className="flex items-start gap-3 px-5 py-3 hover:bg-section"
                 >
-                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/5 text-secondary">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ink/5 text-secondary">
                     <Icon size={14} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-[#222]">
+                    <p className="truncate text-sm text-ink">
                       <span className="font-medium">{contact?.full_name ?? "Unknown contact"}</span>{" "}
                       <span className="text-muted">— {a.title}</span>
                     </p>

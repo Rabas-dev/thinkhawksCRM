@@ -108,7 +108,7 @@ export function isValidSendgridEventSignature(rawBody: string, headers: Headers)
 /**
  * Shared-secret gate for the Inbound Parse webhook (receiving replies).
  * SendGrid's Inbound Parse doesn't sign requests the way the Event Webhook
- * does, so — same pattern as the Twilio webhooks in this app — we append
+ * does, so — same pattern as the Telnyx webhooks in this app — we append
  * ?token=SENDGRID_INBOUND_TOKEN to the URL configured in SendGrid and check
  * it here. Returns false (reject) if no token is configured, since an
  * unauthenticated inbound-email endpoint would let anyone create contacts

@@ -29,7 +29,7 @@ export async function createClient() {
   );
 }
 
-/** Service-role client for webhooks (Twilio/Resend) — bypasses RLS. Server-only, never import in client code. */
+/** Service-role client for webhooks (Telnyx/SendGrid) — bypasses RLS. Server-only, never import in client code. */
 export function createServiceClient() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

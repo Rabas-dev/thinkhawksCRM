@@ -119,7 +119,7 @@ export default function CampaignDetailPage() {
               <div className="min-w-0 flex-1">
                 <Link
                   href={r.contacts ? `/dashboard/contacts/${r.contacts.id}` : "#"}
-                  className="truncate text-sm font-medium text-[#222] hover:underline"
+                  className="truncate text-sm font-medium text-ink hover:underline"
                 >
                   {r.contacts?.full_name ?? "Unknown contact"}
                 </Link>

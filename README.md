@@ -1,10 +1,10 @@
 # Think Hawks CRM
 
 Internal CRM for Think Hawks — contacts, email automation, calling with
-recording, and SMS/WhatsApp messaging in one place.
+recording, and SMS messaging in one place.
 
 **Stack:** Next.js (App Router) · TypeScript · Tailwind v4 · Supabase
-(Postgres + Auth) · Resend (email) · Twilio (voice + messaging)
+(Postgres + Auth) · SendGrid (email) · Telnyx (voice + messaging)
 
 ## Features
 
@@ -16,23 +16,26 @@ recording, and SMS/WhatsApp messaging in one place.
 - **Email** (`/dashboard/email`) — a dedicated outreach workspace: every
   contact with an email on one side, their full threaded conversation on the
   other, with per-message Sent/Delivered/Opened/Clicked/Bounced tracking (via
-  Resend + Resend Inbound) and a template picker with variable substitution
+  SendGrid + SendGrid Inbound Parse) and a template picker with variable
+  substitution
 - **Dialer** (`/dashboard/dialer`) — a dedicated calling workspace: contact
-  list, a full-size in-browser dialer (Twilio Voice SDK), and that contact's
-  call history with recordings, right next to it. The "Call"/"Email" buttons
-  on a contact's page jump straight here with that contact pre-loaded.
+  list, a full-size dial pad, and that contact's call history with
+  recordings, right next to it. The "Call"/"Email" buttons on a contact's
+  page jump straight here with that contact pre-loaded.
 - **Email marketing** — reusable templates (`/dashboard/templates`) and bulk
   campaigns to a segment or your whole list (`/dashboard/campaigns`), with
   per-recipient open/click analytics
-- **Calling + call recording** — a real in-browser dialer (Twilio Voice SDK)
-  available from anywhere in the CRM, with call recording and a
-  disposition/notes prompt after each call
-- **Messaging** — two-way SMS and WhatsApp per contact, plus a shared inbox
-  at `/dashboard/messages`
+- **Calling + call recording** — a real in-browser softphone (Telnyx WebRTC
+  SDK) available from anywhere in the CRM: click to call, talk through your
+  mic/speakers, with call recording and a disposition/notes prompt after each
+  one. Inbound calls to your Telnyx number ring straight into the browser the
+  same way.
+- **Messaging** — two-way SMS per contact, plus a shared inbox at
+  `/dashboard/messages`
 
 ## First-time setup
 
-Nothing here works until you connect Supabase/Resend/Twilio — **read
+Nothing here works until you connect Supabase/SendGrid/Telnyx — **read
 [SETUP.md](./SETUP.md) first**, it walks through creating each account and
 where every key goes. `/dashboard/settings` shows live status of what's
 configured once the app is running.

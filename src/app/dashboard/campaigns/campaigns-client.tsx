@@ -46,7 +46,7 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignWithStats[] 
                   <Megaphone size={15} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[#222]">{c.name}</p>
+                  <p className="truncate text-sm font-medium text-ink">{c.name}</p>
                   <p className="truncate text-xs text-muted">
                     {c.subject} {c.segment_tag ? `· tagged "${c.segment_tag}"` : "· all contacts"}
                   </p>

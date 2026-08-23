@@ -6,8 +6,9 @@ import { Plus, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2 } from "lucide
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
 import { Drawer } from "@/components/ui/drawer";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { Contact } from "@/lib/types";
 import { format } from "date-fns";
 
@@ -122,11 +123,11 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
         )}
       </div>
 
-      <div className="flex-1 overflow-auto rounded-xl border border-border bg-white">
+      <div className="flex-1 overflow-auto rounded-xl border border-border bg-surface">
         <table className="w-full border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-section">
             <tr>
-              <th className="w-10 border-b border-r border-border px-3 py-2.5">
+              <th className="w-10 border-b border-border px-3 py-2.5">
                 <input
                   type="checkbox"
                   checked={selected.size > 0 && selected.size === sorted.length}
@@ -138,7 +139,7 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
                 <th
                   key={col.key}
                   onClick={() => toggleSort(col.key)}
-                  className="cursor-pointer select-none border-b border-r border-border px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted hover:bg-black/5"
+                  className="cursor-pointer select-none border-b border-border px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted hover:bg-ink/5"
                 >
                   <span className="flex items-center gap-1">
                     {col.label}
@@ -175,7 +176,7 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
             ) : (
               sorted.map((c) => (
                 <tr key={c.id} className={cn("group", selected.has(c.id) ? "bg-primary/5" : "hover:bg-section")}>
-                  <td className="border-b border-r border-border px-3 py-2.5">
+                  <td className="border-b border-border px-3 py-2.5">
                     <input
                       type="checkbox"
                       checked={selected.has(c.id)}
@@ -183,24 +184,22 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
                       className="cursor-pointer"
                     />
                   </td>
-                  <td className="border-b border-r border-border px-4 py-2.5">
+                  <td className="border-b border-border px-4 py-2.5">
                     <Link href={`/dashboard/contacts/${c.id}`} className="flex min-w-0 items-center gap-2.5">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary-dark">
-                        {initials(c.full_name)}
-                      </div>
-                      <span className="truncate font-medium text-[#222] hover:text-primary-dark hover:underline">
+                      <Avatar name={c.full_name} size={28} />
+                      <span className="truncate font-medium text-ink hover:text-primary-dark hover:underline">
                         {c.full_name}
                       </span>
                     </Link>
                   </td>
-                  <td className="border-b border-r border-border px-4 py-2.5 whitespace-nowrap text-[#222]">
+                  <td className="border-b border-border px-4 py-2.5 whitespace-nowrap text-ink">
                     {c.phone || "—"}
                   </td>
-                  <td className="border-b border-r border-border px-4 py-2.5 text-[#222]">
+                  <td className="border-b border-border px-4 py-2.5 text-ink">
                     <span className="block max-w-[220px] truncate">{c.email || "—"}</span>
                   </td>
-                  <td className="border-b border-r border-border px-4 py-2.5 text-[#222]">{c.company || "—"}</td>
-                  <td className="border-b border-r border-border px-4 py-2.5 whitespace-nowrap text-muted">
+                  <td className="border-b border-border px-4 py-2.5 text-ink">{c.company || "—"}</td>
+                  <td className="border-b border-border px-4 py-2.5 whitespace-nowrap text-muted">
                     {format(new Date(c.created_at), "MMM d, yyyy")}
                   </td>
                   <td className="border-b border-border px-4 py-2.5">

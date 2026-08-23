@@ -7,7 +7,7 @@ import { requireSendgridInboundToken } from "@/lib/sendgrid";
  * SendGrid's Inbound Parse settings once your receiving domain/subdomain's MX
  * record points at mx.sendgrid.net (see SETUP.md). Unlike the Event Webhook,
  * Inbound Parse doesn't sign requests, so this route is gated by a shared
- * secret in the URL instead (same pattern as the Twilio webhooks).
+ * secret in the URL instead (same pattern as the Telnyx webhooks).
  *
  * SendGrid posts multipart/form-data with `from`/`to`/`subject`/`text`/`html`
  * fields, plus a raw `headers` block (not structured) that we pull

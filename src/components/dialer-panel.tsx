@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Phone, PhoneOff, Mic, MicOff, Delete, User } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Pause, Play, Circle, Delete, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { cn, formatDuration } from "@/lib/utils";
 import { useDialer } from "@/lib/dialer-context";
+import { playDtmfTone } from "@/lib/dtmf-tones";
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 const DISPOSITIONS = ["Connected", "Voicemail", "No answer", "Not interested", "Follow-up needed", "Other"];
@@ -33,7 +34,8 @@ function followUpDueAt(choice: (typeof FOLLOW_UPS)[number], customDate: string):
 /**
  * All call-state UI (dial pad, in-call controls, wrap-up disposition +
  * follow-up, incoming screen-pop) — shared between the floating bubble
- * (Dialer) and the full-size /dashboard/dialer workspace.
+ * (Dialer) and the full-size /dashboard/dialer workspace. Audio runs through
+ * the browser's mic/speakers via Telnyx's WebRTC SDK (src/lib/dialer-context.tsx).
  */
 export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compact" | "large"; onWrapUpSaved?: () => void }) {
   const {
@@ -42,14 +44,21 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
     incoming,
     duration,
     muted,
+    onHold,
+    recordingState,
     error,
-    callSid,
     callRowId,
+    connectionStatus,
+    testCallerNumber,
+    useTestCallerId,
+    setUseTestCallerId,
     placeCall,
     answerIncoming,
     declineIncoming,
     hangUp,
     toggleMute,
+    toggleHold,
+    toggleRecording,
     sendDigits,
     finishWrapUp,
   } = useDialer();
@@ -62,7 +71,7 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
   const [customDate, setCustomDate] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const wrapUpContactId = target?.contactId ?? incoming?.contactId ?? null;
+  const wrapUpContactId = target?.contactId ?? null;
 
   useEffect(() => {
     if (callState === "incoming") return;
@@ -89,15 +98,6 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ disposition, notes }),
       });
-    } else if (callSid) {
-      const lookup = await fetch(`/api/calls?sid=${encodeURIComponent(callSid)}`).then((r) => r.json());
-      if (lookup.call?.id) {
-        await fetch(`/api/calls/${lookup.call.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ disposition, notes }),
-        });
-      }
     }
 
     const dueAt = wrapUpContactId ? followUpDueAt(followUp, customDate) : null;
@@ -132,14 +132,11 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-secondary">
-                {incoming?.contactName || incoming?.callerNumber || "Unknown caller"}
+                {incoming?.callerName || incoming?.callerNumber || "Unknown caller"}
               </p>
               {incoming?.callerNumber && <p className="truncate text-xs text-muted">{incoming.callerNumber}</p>}
             </div>
           </div>
-          {incoming?.previousInteraction && (
-            <p className="text-xs text-muted">Previous interaction: {incoming.previousInteraction}</p>
-          )}
           <div className="flex items-center justify-center gap-4 pt-1">
             <button
               onClick={declineIncoming}
@@ -163,7 +160,7 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
             <select
               value={disposition}
               onChange={(e) => setDisposition(e.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               {DISPOSITIONS.map((d) => (
                 <option key={d} value={d}>
@@ -182,7 +179,7 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
               <select
                 value={followUp}
                 onChange={(e) => setFollowUp(e.target.value as (typeof FOLLOW_UPS)[number])}
-                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 {FOLLOW_UPS.map((f) => (
                   <option key={f} value={f}>
@@ -215,7 +212,7 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
             <Input
               value={number}
               onChange={(e) => setNumber(e.target.value)}
-              placeholder="+92 300 1234567"
+              placeholder="+1 555 123 4567"
               disabled={callState !== "idle"}
             />
             {callState === "idle" && number && (
@@ -232,8 +229,12 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
             {KEYS.map((k) => (
               <button
                 key={k}
-                onClick={() => (callState === "in-call" ? sendDigits(k) : setNumber((n) => n + k))}
-                className={cn("rounded-lg bg-section font-medium text-[#222] hover:bg-black/10 cursor-pointer", keyClass)}
+                onClick={() => {
+                  playDtmfTone(k);
+                  if (callState === "in-call") sendDigits(k);
+                  else setNumber((n) => n + k);
+                }}
+                className={cn("rounded-lg bg-section font-medium text-ink hover:bg-ink/10 cursor-pointer", keyClass)}
               >
                 {k}
               </button>
@@ -241,11 +242,28 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
           </div>
 
           {error && <p className="mb-2 text-xs text-danger">{error}</p>}
+          {!error && callState === "idle" && connectionStatus !== "connected" && (
+            <p className="mb-2 text-xs text-muted">
+              {connectionStatus === "connecting" ? "Connecting…" : "Disconnected — reconnecting…"}
+            </p>
+          )}
+          {callState === "idle" && testCallerNumber && (
+            <label className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={useTestCallerId}
+                onChange={(e) => setUseTestCallerId(e.target.checked)}
+                className="h-3 w-3 cursor-pointer"
+              />
+              Call from test number ({testCallerNumber})
+            </label>
+          )}
 
           <div className="flex items-center justify-center gap-3">
             {callState === "in-call" && (
               <button
                 onClick={toggleMute}
+                title={muted ? "Unmute" : "Mute"}
                 className={cn(
                   "flex h-11 w-11 items-center justify-center rounded-full cursor-pointer",
                   muted ? "bg-warning/20 text-warning" : "bg-section text-secondary",
@@ -255,10 +273,36 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
               </button>
             )}
 
+            {callState === "in-call" && (
+              <button
+                onClick={toggleHold}
+                title={onHold ? "Resume" : "Hold"}
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full cursor-pointer",
+                  onHold ? "bg-warning/20 text-warning" : "bg-section text-secondary",
+                )}
+              >
+                {onHold ? <Play size={17} /> : <Pause size={17} />}
+              </button>
+            )}
+
+            {callState === "in-call" && recordingState !== "stopped" && (
+              <button
+                onClick={toggleRecording}
+                title={recordingState === "recording" ? "Pause recording" : "Resume recording"}
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full cursor-pointer",
+                  recordingState === "recording" ? "bg-danger/15 text-danger" : "bg-section text-secondary",
+                )}
+              >
+                <Circle size={13} fill={recordingState === "recording" ? "currentColor" : "none"} />
+              </button>
+            )}
+
             {callState === "idle" || callState === "error" ? (
               <button
                 onClick={() => placeCall(number)}
-                disabled={!number.trim()}
+                disabled={!number.trim() || connectionStatus !== "connected"}
                 className={cn(
                   "flex items-center justify-center rounded-full bg-success text-white disabled:opacity-50 cursor-pointer",
                   dialBtnClass,
@@ -280,6 +324,7 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
             <p className="mt-3 text-center text-sm text-muted">
               {contactName || number}
               {callState === "in-call" && ` · ${formatDuration(duration)}`}
+              {callState === "in-call" && onHold && " · On hold"}
               {callState === "ringing" && " · Ringing…"}
               {callState === "connecting" && " · Connecting…"}
             </p>

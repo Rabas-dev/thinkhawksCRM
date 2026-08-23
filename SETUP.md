@@ -24,16 +24,15 @@ these are still missing.
    an internal tool — there's no public sign-up page, so add each teammate
    here directly (email + password, or send an invite).
 
-## 2. Twilio SendGrid (email automation — sent/delivered/opened)
+## 2. SendGrid (email automation — sent/delivered/opened)
 
-Email runs on Twilio's own email product (SendGrid), so it bills through the
-same Twilio account as calling/SMS below — one vendor, one bill.
+Email runs on SendGrid (Twilio's email product) — a separate account/bill
+from Telnyx, which handles calling/SMS below.
 
-1. From your Twilio Console, go to **Explore Products → Email API (SendGrid)**
-   and activate it (or sign up directly at [sendgrid.com](https://sendgrid.com)
-   — a SendGrid account created this way links back to Twilio billing). New
-   accounts go through an anti-spam review before they're allowed to send —
-   this can take a few hours, so kick this off first if you're in a hurry.
+1. Create/use your Twilio SendGrid account at [sendgrid.com](https://sendgrid.com).
+   New accounts go through an anti-spam review before they're allowed to
+   send — this can take a few hours, so kick this off first if you're in a
+   hurry.
 2. **Settings → Sender Authentication → Authenticate Your Domain**, add
    `thinkhawks.com` (or a subdomain like `crm.thinkhawks.com`), and add the
    DNS records it gives you wherever your domain is hosted. Wait for it to
@@ -70,7 +69,7 @@ The setup above only covers outbound mail. To have replies land in
 1. Make up a long random string (`openssl rand -hex 24`) and set it as
    `SENDGRID_INBOUND_TOKEN` — Inbound Parse doesn't sign its requests the way
    the Event Webhook does, so this app gates that endpoint with a token in
-   the URL instead, the same way it does for the Twilio webhooks below.
+   the URL instead, the same way it does for the Telnyx webhooks below.
 2. **Settings → Inbound Parse → Add Host & URL**. Use a subdomain you're OK
    routing entirely through SendGrid for receiving, e.g.
    `inbound.thinkhawks.com` (don't reuse your sending domain's MX records —
@@ -84,79 +83,64 @@ The setup above only covers outbound mail. To have replies land in
 4. Have people email `anything@inbound.thinkhawks.com` (or set up mail
    forwarding from your real support address to it) to test.
 
-## 3. Twilio (calling, call recording, SMS/WhatsApp)
+## 3. Telnyx (calling, call recording, SMS)
 
-There's no fully-free way to call and text real phone numbers — every
-provider bills per minute/message. Twilio was picked because it has no
-monthly minimum (pure pay-as-you-go), gives free trial credit to start, and
-has the best-documented Voice + Recording + Messaging APIs.
+Calling runs entirely in the browser — a real softphone using Telnyx's
+WebRTC SDK. Clicking "Call" streams audio straight to your laptop's
+mic/speakers; no phone ever rings. Inbound calls work the same way in
+reverse: anyone with a dashboard tab open gets the incoming call in-browser.
 
-1. Create an account at [twilio.com/try-twilio](https://www.twilio.com/try-twilio)
-   — you get free trial credit automatically.
-2. From the **Console Dashboard**, copy `Account SID` → `TWILIO_ACCOUNT_SID`
-   and `Auth Token` → `TWILIO_AUTH_TOKEN`.
-3. **Phone Numbers → Buy a number** — pick one with Voice + SMS capability.
-   Put it (in `+1...` E.164 format) into `TWILIO_PHONE_NUMBER`.
-   - While on a trial account, Twilio can only call/text numbers you've
-     verified under **Phone Numbers → Verified Caller IDs**. Once you add a
-     few dollars of credit it can reach any number.
-4. Make up a long random string yourself (e.g. run
-   `openssl rand -hex 24` or use a password generator) and set it as both:
-   - `TWILIO_WEBHOOK_TOKEN` in your env vars
-   - nothing else needed — the app appends it to every URL it hands Twilio,
-     so Twilio's callbacks are rejected unless they carry it.
-5. Deploy the app first (see below) so you have a real HTTPS URL, then set
-   `NEXT_PUBLIC_BASE_URL` to that URL and redeploy. Calling won't work on
-   `localhost` — Twilio's servers need to reach your webhook URLs over the
-   public internet.
-6. **Phone Numbers → your number → Messaging → "A message comes in"**: set
-   the webhook to
-   `https://<your-deployed-domain>/api/webhooks/twilio/inbound?token=<TWILIO_WEBHOOK_TOKEN>`,
-   method POST. This is what makes inbound SMS replies show up in
-   `/dashboard/messages` and auto-create a contact if the sender is new.
+1. **API Keys & Tokens** (top-right account menu in the Telnyx portal) →
+   create a key if you don't already have one → `TELNYX_API_KEY`.
+2. **Voice → SIP Connections → Create Credential Connection** (this is the
+   WebRTC-capable connection type — not a Call Control Application):
+   - Give it any name, e.g. "Think Hawks CRM Softphone".
+   - Enable **WebRTC** on the connection (there's a toggle/section for it).
+   - **Webhook URL** (same field Call Control Applications use):
+     `https://<your-deployed-domain>/api/webhooks/telnyx/voice?token=<TELNYX_WEBHOOK_TOKEN>`
+     — make up `TELNYX_WEBHOOK_TOKEN` yourself first (e.g. `openssl rand -hex 24`)
+     and use the same value for both this URL and the env var. Method: POST,
+     format: JSON (the default). This is what logs calls, marks them
+     answered/completed, and starts recording.
+3. Copy that connection's **ID** (shown at the top of its settings page) →
+   `TELNYX_WEBRTC_CONNECTION_ID`. The app mints a brand-new Telephony
+   Credential under this connection for every browser dialer session (see
+   `createSessionCredential` in `src/lib/telnyx.ts`) rather than sharing one
+   static credential — Telnyx only allows one active registration per
+   credential, so a shared one gets silently evicted the moment a second tab
+   or agent connects. Nothing to create by hand here.
+4. **Numbers → Buy Numbers** — pick a number with Voice + SMS capability
+   (Local is fine; a US local number needs A2P 10DLC registration before it
+   can send meaningful SMS volume — a toll-free number skips that in favor of
+   toll-free verification instead, worth deciding up front).
+5. **Numbers → My Numbers → your number → Voice Settings**: set
+   **Connection/App** to the Credential Connection from step 2. This is what
+   routes both outbound *and inbound* calls to whichever dashboard tabs are
+   currently connected as softphones.
+6. Put the number itself (E.164, e.g. `+15551234567`) into `TELNYX_PHONE_NUMBER`
+   — this is the caller ID shown when your team calls out.
+7. **Messaging → Messaging Profiles → Create profile** (or reuse one):
+   - **Inbound settings → Webhook URL**:
+     `https://<your-deployed-domain>/api/webhooks/telnyx/messaging?token=<TELNYX_WEBHOOK_TOKEN>`
+   - Under the profile's **Numbers** tab, add your Telnyx number so it can
+     send/receive SMS through this profile.
+8. Deploy the app first (see below) so you have a real HTTPS URL, then set
+   `NEXT_PUBLIC_BASE_URL` to that URL and redeploy, then go back and fill in
+   the two webhook URLs above with the real domain instead of a placeholder.
+   SMS won't work on `localhost` — Telnyx's servers need to reach your
+   webhook URLs over the public internet. Calling itself works fine on
+   `localhost` (the browser talks to Telnyx directly over WebRTC), but a call
+   won't be logged/recorded correctly until the voice webhook is reachable
+   too, so test both together once deployed (or via an `ngrok` tunnel).
 
-   *(Optional) WhatsApp*: **Messaging → Try it out → Send a WhatsApp
-   message** to get a WhatsApp-enabled sender (sandbox for testing, or apply
-   for a production sender later). Put its number into
-   `TWILIO_WHATSAPP_NUMBER` and point its inbound webhook at the same
-   `/api/webhooks/twilio/inbound` URL.
+Every teammate needs a dashboard tab open (any page under `/dashboard`) and
+to grant the browser mic permission the first time — the softphone connects
+in the background as soon as the dashboard loads, not just when the dial pad
+is open, so inbound calls ring even if no one has clicked into the dialer.
 
-7. Calling uses a real in-browser dialer (Twilio Voice JS SDK) — a floating
-   dial pad available anywhere in the CRM, not a second phone call. Two more
-   things to set up in the Twilio Console:
-   - **Account → API keys & tokens → Create API key** (Standard key) → SID
-     into `TWILIO_API_KEY_SID`, Secret into `TWILIO_API_KEY_SECRET` (shown
-     once — copy it immediately).
-   - **Voice → TwiML → TwiML Apps → Create new TwiML App**. Under **Voice
-     Configuration**:
-     - Request URL:
-       `https://<your-deployed-domain>/api/calls/twiml?token=<TWILIO_WEBHOOK_TOKEN>`,
-       method POST.
-     - Status Callback URL:
-       `https://<your-deployed-domain>/api/webhooks/twilio/call-status?token=<TWILIO_WEBHOOK_TOKEN>`,
-       method POST.
-     Copy the App's SID into `TWILIO_TWIML_APP_SID`.
-   - The dialer needs mic permission in the browser tab it's used from, and
-     (like SMS) needs `NEXT_PUBLIC_BASE_URL` to be a real deployed HTTPS URL
-     — it won't work purely on `localhost`.
-
-8. **Inbound calls** — when a customer calls your Twilio number, it rings
-   every teammate's open dialer at once (whoever's online), screen-popping
-   the caller's name/company and their last call if there's a match, and
-   auto-creating a contact if the number is new. **Phone Numbers → your
-   number → Voice Configuration**:
-   - "A call comes in": Webhook,
-     `https://<your-deployed-domain>/api/calls/incoming?token=<TWILIO_WEBHOOK_TOKEN>`,
-     method POST.
-   - "Call status changes": Webhook,
-     `https://<your-deployed-domain>/api/webhooks/twilio/call-status?token=<TWILIO_WEBHOOK_TOKEN>`,
-     method POST. This is a separate field further down the same page — it's
-     what marks the call completed/no-answer/missed in the CRM, since Twilio
-     assigns this leg's CallSid before our own code ever sees it.
-   - Every teammate needs a dashboard tab open (any page under `/dashboard`)
-     for their browser to be ringable — the dialer registers itself in the
-     background as soon as the dashboard loads, not just when the dial pad
-     is open.
+WhatsApp isn't wired up in this pass — it needs its own Meta Business
+verification through Telnyx and can be added later as a separate piece of
+work.
 
 ## 3.5 Calendar / meeting booking
 
@@ -186,7 +170,7 @@ Otherwise, any Next.js host works (Vercel is the path of least resistance
 since this was scaffolded with `create-next-app`). Set every variable from
 `.env.example` in your host's environment variable settings, then deploy.
 After the first deploy, go back and fill in `NEXT_PUBLIC_BASE_URL` with the
-real deployed URL and redeploy — Twilio needs it to be correct.
+real deployed URL and redeploy — Telnyx and SendGrid both need it to be correct.
 
 ## 5. Local development
 

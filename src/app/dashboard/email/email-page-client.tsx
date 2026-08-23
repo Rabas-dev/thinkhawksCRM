@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Send, Mail as MailIcon, Search } from "lucide-react";
-import { cn, initials } from "@/lib/utils";
+import { Send, Mail as MailIcon, MailOpen, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
 import { format, formatDistanceToNow } from "date-fns";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
@@ -32,6 +33,19 @@ const STATUS_TONE: Record<string, "muted" | "success" | "primary" | "danger" | "
 };
 
 const STATUS_ORDER = ["sent", "delivered", "opened", "clicked", "bounced", "complained", "failed"] as const;
+
+/** Quick-glance opened/not-opened indicator for a sent email — GHL-style, separate from the fuller TrackingTimeline below. */
+function OpenedIndicator({ status }: { status: string }) {
+  const opened = status === "opened" || status === "clicked";
+  return (
+    <span
+      title={opened ? "Opened" : "Not opened yet"}
+      className={cn("inline-flex shrink-0 items-center", opened ? "text-success" : "text-muted")}
+    >
+      {opened ? <MailOpen size={12} /> : <MailIcon size={12} />}
+    </span>
+  );
+}
 
 function TrackingTimeline({ events }: { events: EmailEvent[] }) {
   if (events.length === 0) return null;
@@ -133,7 +147,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
 
   return (
     <div className="flex h-screen">
-      <div className="flex w-80 shrink-0 flex-col border-r border-border bg-white">
+      <div className="flex w-80 shrink-0 flex-col border-r border-border bg-surface">
         <div className="border-b border-border px-5 py-4">
           <h1 className="text-lg font-semibold text-secondary">Email</h1>
           <div className="relative mt-3">
@@ -154,20 +168,19 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                   selectedId === c.id ? "bg-primary/10" : "hover:bg-section",
                 )}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-dark">
-                  {initials(c.full_name)}
-                </div>
+                <Avatar name={c.full_name} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-[#222]">{c.full_name}</p>
+                    <p className="truncate text-sm font-medium text-ink">{c.full_name}</p>
                     {c.lastEmail && (
                       <span className="shrink-0 text-[10px] text-muted">
                         {formatDistanceToNow(new Date(c.lastEmail.created_at), { addSuffix: false })}
                       </span>
                     )}
                   </div>
-                  <p className="truncate text-xs text-muted">
-                    {c.lastEmail ? c.lastEmail.subject || "(no subject)" : c.email}
+                  <p className="flex items-center gap-1 truncate text-xs text-muted">
+                    {c.lastEmail?.direction === "outbound" && <OpenedIndicator status={c.lastEmail.status} />}
+                    <span className="truncate">{c.lastEmail ? c.lastEmail.subject || "(no subject)" : c.email}</span>
                   </p>
                 </div>
               </button>
@@ -184,7 +197,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-border bg-white px-5 py-4">
+            <div className="flex items-center justify-between border-b border-border bg-surface px-5 py-4">
               <div>
                 <p className="text-sm font-medium text-secondary">{activeContact?.full_name}</p>
                 <p className="text-xs text-muted">{activeContact?.email}</p>
@@ -203,18 +216,19 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                     <div
                       key={e.id}
                       className={cn(
-                        "max-w-[80%] rounded-xl border border-border bg-white p-3",
+                        "max-w-[80%] rounded-xl border border-border bg-surface p-3",
                         e.direction === "outbound" ? "ml-auto" : "mr-auto",
                       )}
                     >
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-[#222]">{e.subject || "(no subject)"}</p>
+                        <p className="text-xs font-semibold text-ink">{e.subject || "(no subject)"}</p>
                         {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
                       </div>
-                      <p className="whitespace-pre-wrap text-sm text-[#222]">{e.text_body}</p>
-                      <p className="mt-1.5 text-[10px] text-muted">
+                      <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
+                      <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
                         {e.direction === "outbound" ? "You" : activeContact?.full_name} ·{" "}
                         {format(new Date(e.created_at), "MMM d, h:mm a")}
+                        {e.direction === "outbound" && <OpenedIndicator status={e.status} />}
                       </p>
                       {e.direction === "outbound" && <TrackingTimeline events={relatedEvents} />}
                     </div>
@@ -223,12 +237,12 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
               )}
             </div>
 
-            <form onSubmit={sendReply} className="space-y-2 border-t border-border bg-white p-4">
+            <form onSubmit={sendReply} className="space-y-2 border-t border-border bg-surface p-4">
               {templates.length > 0 && (
                 <select
                   onChange={(ev) => applyTemplate(ev.target.value)}
                   defaultValue=""
-                  className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">Use a template…</option>
                   {templates.map((t) => (
@@ -242,7 +256,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Subject"
-                className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <div className="flex gap-2">
                 <textarea
@@ -250,7 +264,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Write a message…"
                   rows={3}
-                  className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
                 <Button type="submit" size="icon" disabled={sending} className="self-end">
                   <Send size={15} />

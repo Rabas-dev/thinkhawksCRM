@@ -20,14 +20,14 @@ export function Dialer() {
 
   const headerName =
     callState === "incoming"
-      ? incoming?.contactName || incoming?.callerNumber || "Incoming call"
+      ? incoming?.callerName || incoming?.callerNumber || "Incoming call"
       : callState === "in-call" || callState === "ringing" || callState === "connecting"
         ? target?.contactName || target?.number || "Dialer"
         : "Dialer";
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-72 overflow-hidden rounded-2xl border border-border bg-white shadow-xl">
-      <div className="flex items-center justify-between border-b border-border bg-secondary px-4 py-3">
+    <div className="fixed bottom-6 right-6 z-50 w-72 overflow-hidden rounded-2xl border border-border bg-surface shadow-xl">
+      <div className="flex items-center justify-between border-b border-border bg-chrome px-4 py-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-white">{headerName}</p>
           {callState === "in-call" && <p className="text-[11px] text-white/70">{formatDuration(duration)}</p>}

@@ -23,7 +23,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Card, Badge } from "@/components/ui/card";
-import { cn, initials, formatDuration } from "@/lib/utils";
+import { Avatar } from "@/components/ui/avatar";
+import { cn, formatDuration } from "@/lib/utils";
 import { useDialer } from "@/lib/dialer-context";
 import { MeetingDialog } from "@/components/meeting-dialog";
 import type {
@@ -246,7 +247,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
   return (
     <div className="flex h-screen">
       {/* Left: contacts list */}
-      <div className="flex w-72 shrink-0 flex-col border-r border-border bg-white">
+      <div className="flex w-72 shrink-0 flex-col border-r border-border bg-surface">
         <div className="border-b border-border px-4 py-4">
           <h1 className="text-lg font-semibold text-secondary">Contacts</h1>
           <div className="relative mt-3">
@@ -264,11 +265,9 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
                 c.id === contact.id ? "bg-primary/10" : "hover:bg-section",
               )}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-dark">
-                {initials(c.full_name)}
-              </div>
+              <Avatar name={c.full_name} size={36} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[#222]">{c.full_name}</p>
+                <p className="truncate text-sm font-medium text-ink">{c.full_name}</p>
                 <p className="truncate text-xs text-muted">{c.email || c.phone || "—"}</p>
               </div>
             </button>
@@ -278,7 +277,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
 
       {/* Middle: unified thread */}
       <div className="flex flex-1 flex-col bg-section">
-        <div className="flex items-center justify-between border-b border-border bg-white px-5 py-4">
+        <div className="flex items-center justify-between border-b border-border bg-surface px-5 py-4">
           <div>
             <p className="text-sm font-medium text-secondary">{contact.full_name}</p>
             <p className="text-xs text-muted">{contact.email || contact.phone || "—"}</p>
@@ -309,9 +308,9 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
           )}
         </div>
 
-        <form onSubmit={sendFromComposer} className="space-y-2 border-t border-border bg-white p-4">
+        <form onSubmit={sendFromComposer} className="space-y-2 border-t border-border bg-surface p-4">
           <div className="flex gap-1.5">
-            {(["email", "sms", "whatsapp"] as const).map((c) => (
+            {(["email", "sms"] as const).map((c) => (
               <button
                 key={c}
                 type="button"
@@ -319,7 +318,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
                 disabled={c === "email" ? !contact.email : !contact.phone}
                 className={cn(
                   "rounded-full px-3 py-1 text-xs font-medium capitalize cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
-                  channel === c ? "bg-primary text-white" : "bg-black/5 text-secondary",
+                  channel === c ? "bg-primary text-white" : "bg-ink/5 text-secondary",
                 )}
               >
                 {c}
@@ -331,7 +330,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Subject"
-              className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
           )}
           <div className="flex gap-2">
@@ -340,7 +339,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
               onChange={(e) => setBody(e.target.value)}
               placeholder={channel === "email" ? "Write an email…" : `Write a ${channel} message…`}
               rows={3}
-              className="flex-1 rounded-lg border border-border bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <Button type="submit" size="icon" disabled={sending} className="self-end">
               <Send size={15} />
@@ -351,12 +350,10 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
       </div>
 
       {/* Right: details panel */}
-      <div className="w-80 shrink-0 space-y-4 overflow-y-auto border-l border-border bg-white p-4">
+      <div className="w-80 shrink-0 space-y-4 overflow-y-auto border-l border-border bg-surface p-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary-dark">
-              {initials(contact.full_name)}
-            </div>
+            <Avatar name={contact.full_name} size={44} />
             <div>
               <p className="text-sm font-semibold text-secondary">{contact.full_name}</p>
               {contact.company && (
@@ -379,7 +376,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
           <select
             value={stage}
             onChange={(e) => changeStage(e.target.value as PipelineStage)}
-            className="h-9 w-full rounded-lg border border-border bg-white px-3 text-sm font-medium text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm font-medium text-secondary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             {Object.entries(STAGE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>
@@ -396,7 +393,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
           <Field label="Company" value={contact.company} />
           <div>
             <p className="text-xs text-muted">Last contacted</p>
-            <p className="text-sm text-[#222]">
+            <p className="text-sm text-ink">
               {lastContactedActivity
                 ? formatDistanceToNow(new Date(lastContactedActivity.created_at), { addSuffix: true })
                 : "—"}
@@ -435,7 +432,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
                 <div key={m.id} className="rounded-lg bg-section px-3 py-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm text-[#222]">{m.title}</p>
+                      <p className="truncate text-sm text-ink">{m.title}</p>
                       <p className="text-xs text-muted">{format(new Date(m.start_at), "MMM d, h:mm a")}</p>
                       {m.location && (
                         <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
@@ -481,7 +478,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
               {tasks.map((t) => (
                 <div key={t.id} className="flex items-center justify-between rounded-lg bg-section px-3 py-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-[#222]">{t.title}</p>
+                    <p className="truncate text-sm text-ink">{t.title}</p>
                     <p className="text-xs text-muted">{format(new Date(t.due_at), "MMM d, h:mm a")}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -494,7 +491,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
                     </button>
                     <button
                       onClick={() => updateTask(t.id, "skipped")}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-black/5 cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-muted hover:bg-ink/5 cursor-pointer"
                       title="Skip"
                     >
                       <XIcon size={14} />
@@ -530,7 +527,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
           {contact.notes && (
             <div className="mt-3 border-t border-border pt-3">
               <p className="mb-1 text-xs text-muted">Notes</p>
-              <p className="text-sm text-[#222]">{contact.notes}</p>
+              <p className="text-sm text-ink">{contact.notes}</p>
             </div>
           )}
         </Card>
@@ -550,9 +547,9 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
   if (item.kind === "call") {
     const c = item.call;
     return (
-      <div className="mx-auto max-w-[85%] rounded-xl border border-border bg-white p-3">
+      <div className="mx-auto max-w-[85%] rounded-xl border border-border bg-surface p-3">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-sm text-[#222]">
+          <span className="flex items-center gap-1.5 text-sm text-ink">
             {c.direction === "outbound" ? (
               <PhoneOutgoing size={13} className="text-primary-dark" />
             ) : (
@@ -575,7 +572,7 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
         <div
           className={cn(
             "max-w-[75%] rounded-xl px-3 py-2 text-sm",
-            m.direction === "outbound" ? "bg-primary text-white" : "border border-border bg-white text-[#222]",
+            m.direction === "outbound" ? "bg-primary text-white" : "border border-border bg-surface text-ink",
           )}
         >
           <p className="whitespace-pre-wrap">{m.body}</p>
@@ -591,15 +588,15 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
   return (
     <div
       className={cn(
-        "max-w-[80%] rounded-xl border border-border bg-white p-3",
+        "max-w-[80%] rounded-xl border border-border bg-surface p-3",
         e.direction === "outbound" ? "ml-auto" : "mr-auto",
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-[#222]">{e.subject || "(no subject)"}</p>
+        <p className="text-xs font-semibold text-ink">{e.subject || "(no subject)"}</p>
         {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
       </div>
-      <p className="whitespace-pre-wrap text-sm text-[#222]">{e.text_body}</p>
+      <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
       <p className="mt-1.5 text-[10px] text-muted">
         {e.direction === "outbound" ? "You" : contact.full_name} · {format(new Date(e.created_at), "MMM d, h:mm a")}
       </p>
@@ -620,7 +617,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
       <p className="text-xs text-muted">{label}</p>
-      <p className="text-sm text-[#222]">{value || "—"}</p>
+      <p className="text-sm text-ink">{value || "—"}</p>
     </div>
   );
 }

@@ -49,7 +49,7 @@ export function CallsClient({ calls }: { calls: CallRow[] }) {
               onClick={() => setDirection(d)}
               className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium capitalize cursor-pointer",
-                direction === d ? "bg-primary text-white" : "bg-black/5 text-secondary",
+                direction === d ? "bg-primary text-white" : "bg-ink/5 text-secondary",
               )}
             >
               {d}
@@ -76,7 +76,7 @@ export function CallsClient({ calls }: { calls: CallRow[] }) {
               <div className="min-w-0 flex-1">
                 <Link
                   href={c.contacts ? `/dashboard/contacts/${c.contacts.id}` : "#"}
-                  className="truncate text-sm font-medium text-[#222] hover:underline"
+                  className="truncate text-sm font-medium text-ink hover:underline"
                 >
                   {c.contacts?.full_name ?? "Unknown contact"}
                 </Link>

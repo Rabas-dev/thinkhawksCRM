@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, PhoneIncoming, PhoneOutgoing, Building2 } from "lucide-react";
-import { cn, initials, formatDuration } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Card, Badge } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
 import { DialerPanel } from "@/components/dialer-panel";
 import { useDialer } from "@/lib/dialer-context";
 import type { Call } from "@/lib/types";
@@ -71,7 +72,7 @@ export function DialerPageClient({ contacts }: { contacts: ContactRow[] }) {
 
   return (
     <div className="flex h-screen">
-      <div className="flex w-80 shrink-0 flex-col border-r border-border bg-white">
+      <div className="flex w-80 shrink-0 flex-col border-r border-border bg-surface">
         <div className="border-b border-border px-5 py-4">
           <h1 className="text-lg font-semibold text-secondary">Dialer</h1>
           <div className="relative mt-3">
@@ -92,12 +93,10 @@ export function DialerPageClient({ contacts }: { contacts: ContactRow[] }) {
                   selectedId === c.id ? "bg-primary/10" : "hover:bg-section",
                 )}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-dark">
-                  {initials(c.full_name)}
-                </div>
+                <Avatar name={c.full_name} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-[#222]">{c.full_name}</p>
+                    <p className="truncate text-sm font-medium text-ink">{c.full_name}</p>
                     {c.lastCall && (
                       <span className="shrink-0 text-[10px] text-muted">
                         {formatDistanceToNow(new Date(c.lastCall.created_at), { addSuffix: false })}

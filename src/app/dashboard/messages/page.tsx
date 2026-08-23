@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Send } from "lucide-react";
-import { cn, initials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 import { format, formatDistanceToNow } from "date-fns";
 import type { Message, MessageChannel } from "@/lib/types";
 
@@ -21,7 +22,6 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [contactPhone, setContactPhone] = useState<string | null>(null);
   const [body, setBody] = useState("");
-  const [channel, setChannel] = useState<MessageChannel>("sms");
   const [sending, setSending] = useState(false);
 
   const loadThreads = useCallback(async () => {
@@ -54,7 +54,7 @@ export default function MessagesPage() {
     await fetch("/api/messages/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contact_id: activeId, body, channel }),
+      body: JSON.stringify({ contact_id: activeId, body }),
     });
     setBody("");
     setSending(false);
@@ -64,7 +64,7 @@ export default function MessagesPage() {
 
   return (
     <div className="flex h-screen">
-      <div className="w-80 shrink-0 overflow-y-auto border-r border-border bg-white">
+      <div className="w-80 shrink-0 overflow-y-auto border-r border-border bg-surface">
         <div className="border-b border-border px-5 py-4">
           <h1 className="text-lg font-semibold text-secondary">Messages</h1>
         </div>
@@ -80,11 +80,9 @@ export default function MessagesPage() {
                 activeId === t.contact_id ? "bg-primary/10" : "hover:bg-section",
               )}
             >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-dark">
-                {initials(t.contacts?.full_name ?? "?")}
-              </div>
+              <Avatar name={t.contacts?.full_name ?? "?"} size={36} />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-[#222]">
+                <p className="truncate text-sm font-medium text-ink">
                   {t.contacts?.full_name ?? "Unknown"}
                 </p>
                 <p className="truncate text-xs text-muted">{t.body}</p>
@@ -104,22 +102,8 @@ export default function MessagesPage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-border bg-white px-5 py-4">
+            <div className="flex items-center justify-between border-b border-border bg-surface px-5 py-4">
               <p className="text-sm font-medium text-secondary">{contactPhone}</p>
-              <div className="flex gap-1.5">
-                {(["sms", "whatsapp"] as MessageChannel[]).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setChannel(c)}
-                    className={cn(
-                      "rounded-full px-3 py-1 text-xs font-medium capitalize cursor-pointer",
-                      channel === c ? "bg-primary text-white" : "bg-black/5 text-secondary",
-                    )}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto p-5">
@@ -133,7 +117,7 @@ export default function MessagesPage() {
                       "max-w-[60%] rounded-xl px-3 py-2 text-sm",
                       m.direction === "outbound"
                         ? "bg-primary text-white"
-                        : "border border-border bg-white text-[#222]",
+                        : "border border-border bg-surface text-ink",
                     )}
                   >
                     <p>{m.body}</p>
@@ -150,12 +134,12 @@ export default function MessagesPage() {
               ))}
             </div>
 
-            <form onSubmit={send} className="flex gap-2 border-t border-border bg-white p-4">
+            <form onSubmit={send} className="flex gap-2 border-t border-border bg-surface p-4">
               <input
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
-                placeholder={`Write a ${channel} message…`}
-                className="h-10 flex-1 rounded-lg border border-border bg-white px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Write a message…"
+                className="h-10 flex-1 rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <Button type="submit" size="icon" disabled={sending}>
                 <Send size={15} />
