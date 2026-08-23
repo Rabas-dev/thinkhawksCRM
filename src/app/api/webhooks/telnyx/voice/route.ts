@@ -68,14 +68,18 @@ export async function POST(request: NextRequest) {
           contact = created;
         }
 
-        await supabase.from("calls").insert({
-          contact_id: contact?.id ?? null,
-          telnyx_call_control_id: payload.call_control_id,
-          telnyx_call_session_id: payload.call_session_id,
-          direction: "inbound",
-          status: "ringing",
-          contact_phone: from,
-        });
+        const { data: insertedCall } = await supabase
+          .from("calls")
+          .insert({
+            contact_id: contact?.id ?? null,
+            telnyx_call_control_id: payload.call_control_id,
+            telnyx_call_session_id: payload.call_session_id,
+            direction: "inbound",
+            status: "ringing",
+            contact_phone: from,
+          })
+          .select("id")
+          .single();
 
         const { data: session } = await supabase
           .from("dialer_sessions")
@@ -87,10 +91,18 @@ export async function POST(request: NextRequest) {
         if (session?.sip_username) {
           try {
             await transferCall(payload.call_control_id as string, session.sip_username);
-          } catch {
-            // If the transfer fails (e.g. the session died without cleaning up its
-            // row) the call just rings out — nothing else to fall back to.
+          } catch (err) {
+            // Debugging aid — this route runs on a host we can't tail logs on,
+            // so the failure reason goes straight on the call record instead.
+            if (insertedCall) {
+              await supabase
+                .from("calls")
+                .update({ notes: `transfer failed: ${err instanceof Error ? err.message : String(err)}` })
+                .eq("id", insertedCall.id);
+            }
           }
+        } else if (insertedCall) {
+          await supabase.from("calls").update({ notes: "transfer skipped: no dialer_sessions row" }).eq("id", insertedCall.id);
         }
         break;
       }
