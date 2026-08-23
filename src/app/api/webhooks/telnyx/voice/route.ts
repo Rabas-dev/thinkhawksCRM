@@ -41,10 +41,12 @@ export async function POST(request: NextRequest) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
+  const receivedAt = Date.now();
   const body = await request.json().catch(() => null);
   const event = body?.data;
   const eventType: string | undefined = event?.event_type;
   const payload = event?.payload;
+  const occurredAt: string | undefined = event?.occurred_at;
   if (!eventType || !payload) return NextResponse.json({ ok: true });
 
   const supabase = createServiceClient();
@@ -89,15 +91,22 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
 
         if (session?.sip_username) {
+          const deliveryLagMs = occurredAt ? receivedAt - new Date(occurredAt).getTime() : null;
+          const beforeBridgeMs = Date.now() - receivedAt;
           try {
             await bridgeToSession(payload.call_control_id as string, session.sip_username);
           } catch (err) {
             // Debugging aid — this route runs on a host we can't tail logs on,
-            // so the failure reason goes straight on the call record instead.
+            // so the failure reason and timing go straight on the call record
+            // instead, to tell apart a cold-start delay (Passenger sleeps
+            // after idle traffic — see DEPLOY-HOSTINGER.md) from anything else.
             if (insertedCall) {
+              const afterBridgeMs = Date.now() - receivedAt;
               await supabase
                 .from("calls")
-                .update({ notes: `bridge failed: ${err instanceof Error ? err.message : String(err)}` })
+                .update({
+                  notes: `bridge failed: ${err instanceof Error ? err.message : String(err)} (delivery lag ${deliveryLagMs}ms, handler took ${beforeBridgeMs}ms before bridge / ${afterBridgeMs}ms total)`,
+                })
                 .eq("id", insertedCall.id);
             }
           }
