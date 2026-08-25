@@ -31,6 +31,15 @@ export async function GET() {
     await supabase
       .from("dialer_sessions")
       .insert({ credential_id: credentialId, sip_username: sipUsername, user_email: user.email ?? null });
+    // Best-effort GC for rows a crashed/force-closed tab never got to DELETE
+    // (the pagehide handler can't fire for every ungraceful exit). Doesn't
+    // fully solve "is this session actually still alive" for inbound-call
+    // routing, but keeps genuinely abandoned rows from lingering indefinitely.
+    supabase
+      .from("dialer_sessions")
+      .delete()
+      .lt("created_at", new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
+      .then(() => {});
     return NextResponse.json({
       token,
       credentialId,

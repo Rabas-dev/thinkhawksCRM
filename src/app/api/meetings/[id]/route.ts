@@ -3,6 +3,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getSendgrid, EMAIL_FROM, meetingEmailHtml } from "@/lib/sendgrid";
+import { escapeHtml } from "@/lib/utils";
 
 const updateSchema = z.object({
   title: z.string().min(1).optional(),
@@ -60,7 +61,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         subject: canceled ? `Meeting canceled: ${meeting.title}` : `Meeting rescheduled: ${meeting.title}`,
         html: meetingEmailHtml({
           heading: canceled ? "Your meeting has been canceled" : "Your meeting was rescheduled",
-          intro: `Hi ${contact.full_name.split(" ")[0]}, ${
+          intro: `Hi ${escapeHtml(contact.full_name.split(" ")[0])}, ${
             canceled
               ? "the meeting below has been canceled."
               : "here are the updated details for your meeting with Think Hawks."

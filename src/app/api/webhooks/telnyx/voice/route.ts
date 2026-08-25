@@ -18,6 +18,17 @@ function mapHangupStatus(cause: string | undefined): CallStatus {
   }
 }
 
+const HANGUP_STATUS_LABEL: Record<CallStatus, string> = {
+  completed: "Call completed",
+  "no-answer": "Missed call",
+  busy: "Call not connected (busy)",
+  canceled: "Call canceled",
+  failed: "Call failed",
+  initiated: "Call",
+  ringing: "Call",
+  "in-progress": "Call",
+};
+
 /**
  * Single webhook URL for every Call Control event, configured once on the
  * Telnyx Credential Connection behind the browser softphone
@@ -93,19 +104,34 @@ export async function POST(request: NextRequest) {
         if (session?.sip_username) {
           const deliveryLagMs = occurredAt ? receivedAt - new Date(occurredAt).getTime() : null;
           const beforeBridgeMs = Date.now() - receivedAt;
-          try {
-            await bridgeToSession(payload.call_control_id as string, session.sip_username);
-          } catch (err) {
+          let lastErr: unknown;
+          let bridged = false;
+          // One retry after a short delay — covers a transient failure on
+          // our side (e.g. a cold-starting host, per DEPLOY-HOSTINGER.md's
+          // idle-sleep caveat, being slow enough that the first dial/bridge
+          // call itself times out). It can't help if the inbound leg has
+          // already ended (caller hung up / Telnyx's own ring timeout) —
+          // that fails identically on retry — but costs little to attempt.
+          for (let attempt = 0; attempt < 2; attempt++) {
+            if (attempt > 0) await new Promise((r) => setTimeout(r, 1200));
+            try {
+              await bridgeToSession(payload.call_control_id as string, session.sip_username);
+              bridged = true;
+              break;
+            } catch (err) {
+              lastErr = err;
+            }
+          }
+          if (!bridged) {
             // Debugging aid — this route runs on a host we can't tail logs on,
             // so the failure reason and timing go straight on the call record
-            // instead, to tell apart a cold-start delay (Passenger sleeps
-            // after idle traffic — see DEPLOY-HOSTINGER.md) from anything else.
+            // instead, to tell apart a cold-start delay from anything else.
             if (insertedCall) {
               const afterBridgeMs = Date.now() - receivedAt;
               await supabase
                 .from("calls")
                 .update({
-                  notes: `bridge failed: ${err instanceof Error ? err.message : String(err)} (delivery lag ${deliveryLagMs}ms, handler took ${beforeBridgeMs}ms before bridge / ${afterBridgeMs}ms total)`,
+                  notes: `bridge failed: ${lastErr instanceof Error ? lastErr.message : String(lastErr)} (delivery lag ${deliveryLagMs}ms, handler took ${beforeBridgeMs}ms before first bridge attempt / ${afterBridgeMs}ms total, 2 attempts)`,
                 })
                 .eq("id", insertedCall.id);
             }
@@ -171,11 +197,15 @@ export async function POST(request: NextRequest) {
         })
         .eq("id", call.id);
 
-      if (call.contact_id && wasConnected) {
+      // Logged regardless of whether the call connected — a missed/unanswered
+      // inbound call is exactly the kind of thing an agent needs to see in a
+      // contact's timeline, not just completed ones.
+      if (call.contact_id) {
+        const label = HANGUP_STATUS_LABEL[finalStatus];
         await supabase.from("activities").insert({
           contact_id: call.contact_id,
           type: "call",
-          title: `Call completed (${durationSeconds ?? 0}s)`,
+          title: wasConnected ? `${label} (${durationSeconds ?? 0}s)` : label,
           body: `${call.direction === "outbound" ? "Outbound" : "Inbound"} call ${call.direction === "outbound" ? "to" : "from"} ${call.contact_phone ?? ""}`,
           metadata: { call_id: call.id },
         });

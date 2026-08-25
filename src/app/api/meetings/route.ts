@@ -3,6 +3,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { getSendgrid, EMAIL_FROM, meetingEmailHtml, isSendgridConfigError, sendgridErrorMessage, firstSendgridHeader } from "@/lib/sendgrid";
+import { escapeHtml } from "@/lib/utils";
 
 const createSchema = z
   .object({
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
         subject: `Meeting confirmed: ${meeting.title}`,
         html: meetingEmailHtml({
           heading: "Your meeting is confirmed",
-          intro: `Hi ${contact.full_name.split(" ")[0]}, this confirms your upcoming meeting with Think Hawks.`,
+          intro: `Hi ${escapeHtml(contact.full_name.split(" ")[0])}, this confirms your upcoming meeting with Think Hawks.`,
           title: meeting.title,
           whenLabel,
           location: meeting.location,

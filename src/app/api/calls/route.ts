@@ -19,6 +19,22 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ call: data });
   }
 
+  // Looked up by the dialer right after an inbound call starts ringing, to
+  // find the `calls` row the voice webhook creates server-side — the
+  // browser's WebRTC event has no direct reference to it otherwise, which
+  // otherwise left callRowId/contact permanently null for inbound calls
+  // (silently breaking wrap-up disposition saves and follow-up tasks).
+  const sessionId = request.nextUrl.searchParams.get("session_id");
+  if (sessionId) {
+    const { data, error } = await supabase
+      .from("calls")
+      .select("id, contact_id, contacts(id, full_name)")
+      .eq("telnyx_call_session_id", sessionId)
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ call: data });
+  }
+
   // Polled by the dialer to screen-pop inbound calls the moment they start
   // ringing — since the browser has no persistent connection to Telnyx.
   const inboundSince = request.nextUrl.searchParams.get("inbound_since");

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getSendgrid, EMAIL_FROM, isSendgridConfigError, firstSendgridHeader } from "@/lib/sendgrid";
+import { getSendgrid, EMAIL_FROM, wrapEmailHtml, isSendgridConfigError, firstSendgridHeader } from "@/lib/sendgrid";
 import { renderTemplate } from "@/lib/templates";
 
 const CHUNK_SIZE = 100;
@@ -9,13 +9,6 @@ function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
-}
-
-function toHtml(body: string) {
-  return `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#222">${body
-    .split("\n")
-    .map((line) => `<p>${line}</p>`)
-    .join("")}</div>`;
 }
 
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -91,11 +84,19 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           from: EMAIL_FROM,
           to: contact.email!,
           subject: renderTemplate(campaign.subject, contact),
-          html: toHtml(renderTemplate(campaign.body, contact)),
+          html: wrapEmailHtml(renderTemplate(campaign.body, contact)),
           customArgs: { contact_id: contact.id, campaign_id: id },
         }),
       ),
     );
+
+    // Each recipient's outcome only needs to update local arrays here — the
+    // DB writes are batched below instead of one round-trip per recipient,
+    // which serialized up to 3x the batch size in awaited calls even though
+    // the sends themselves were already parallel.
+    const recipientUpdates: { id: string; status: "sent" | "failed"; resend_email_id?: string | null }[] = [];
+    const eventInserts: { contact_id: string; campaign_id: string; resend_email_id: string | null; subject: string; status: "sent" }[] = [];
+    const activityInserts: { contact_id: string; type: "email"; title: string; body: string }[] = [];
 
     for (let i = 0; i < batch.length; i++) {
       const contact = batch[i];
@@ -105,34 +106,38 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
       if (result.status === "rejected") {
         anyFailed = true;
-        await supabase.from("campaign_recipients").update({ status: "failed" }).eq("id", recipient.id);
+        recipientUpdates.push({ id: recipient.id, status: "failed" });
         continue;
       }
 
       const [response] = result.value;
       const resendEmailId = firstSendgridHeader(response.headers, "x-message-id");
+      const subject = renderTemplate(campaign.subject, contact);
 
-      await supabase
-        .from("campaign_recipients")
-        .update({ status: "sent", resend_email_id: resendEmailId })
-        .eq("id", recipient.id);
-
-      await supabase.from("email_events").insert({
+      recipientUpdates.push({ id: recipient.id, status: "sent", resend_email_id: resendEmailId });
+      eventInserts.push({
         contact_id: contact.id,
         campaign_id: id,
         resend_email_id: resendEmailId,
-        subject: renderTemplate(campaign.subject, contact),
+        subject,
         status: "sent",
       });
-
-      await supabase.from("activities").insert({
+      activityInserts.push({
         contact_id: contact.id,
         type: "email",
         title: `Campaign email sent: ${campaign.name}`,
-        body: renderTemplate(campaign.subject, contact),
+        body: subject,
       });
       anySent = true;
     }
+
+    await Promise.all([
+      recipientUpdates.length > 0
+        ? supabase.from("campaign_recipients").upsert(recipientUpdates)
+        : Promise.resolve(),
+      eventInserts.length > 0 ? supabase.from("email_events").insert(eventInserts) : Promise.resolve(),
+      activityInserts.length > 0 ? supabase.from("activities").insert(activityInserts) : Promise.resolve(),
+    ]);
   }
 
   await supabase

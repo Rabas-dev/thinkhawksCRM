@@ -130,6 +130,7 @@ export function PipelineClient({ initialContacts }: { initialContacts: Contact[]
         onClose={() => setEmailTarget(null)}
         contactId={emailTarget?.id ?? ""}
         contactEmail={emailTarget?.email ?? null}
+        contact={emailTarget}
         onSent={() => setEmailTarget(null)}
       />
     </div>

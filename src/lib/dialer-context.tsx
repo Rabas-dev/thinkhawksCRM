@@ -1,8 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect, ReactNode } from "react";
 import type { TelnyxRTC, Call as TelnyxCall } from "@telnyx/webrtc";
-import { RINGTONE_URL, RINGBACK_TONE_URL } from "@/lib/dialer-tones";
+// Dynamically imported alongside @telnyx/webrtc below, not at module scope —
+// the two base64-encoded tones are ~100KB+ and DialerProvider wraps the
+// entire dashboard layout, so a static import here would ship that weight
+// on every single dashboard page load instead of only when the dialer
+// actually connects.
 
 export type DialerTarget = { number: string; contactId?: string; contactName?: string };
 
@@ -53,6 +57,21 @@ type DialerContextValue = {
 };
 
 const DialerContext = createContext<DialerContextValue | null>(null);
+
+/**
+ * Releases a session's Telephony Credential — fire-and-forget, called from
+ * three places (an out-of-date getClient generation resolving after
+ * teardown, in two different async gaps, plus the normal disconnect path)
+ * so it's centralized here rather than repeated at each call site.
+ */
+function releaseCredentialFetch(credentialId: string) {
+  // keepalive lets this survive a tab close/reload, when the browser would
+  // otherwise abort an in-flight fetch before it reaches the server.
+  fetch(`/api/calls/token?credentialId=${encodeURIComponent(credentialId)}`, {
+    method: "DELETE",
+    keepalive: true,
+  }).catch(() => {});
+}
 
 function readCallerId(call: TelnyxCall): IncomingInfo {
   const options = (call as unknown as { options?: Record<string, unknown> }).options ?? {};
@@ -117,6 +136,41 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     timerRef.current = null;
   }, []);
 
+  // The WebRTC ring event has no reference to the `calls` row the voice
+  // webhook creates server-side for the same inbound call — without this,
+  // callRowId/target stay null for the whole call, silently breaking the
+  // wrap-up disposition save and follow-up tasks. The webhook and this
+  // event are two independent deliveries from Telnyx with no ordering
+  // guarantee, so retry briefly in case we're first.
+  const resolveInboundCallRow = useCallback(async (sessionId: string) => {
+    // 20 attempts ~1s apart covers a typical ~20-30s ring cycle, including a
+    // cold-starting host (DEPLOY-HOSTINGER.md: Passenger sleeps after idle
+    // traffic) that can take several seconds just to process the webhook's
+    // first request. Stops early once the call isn't ringing anymore.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 1000));
+      if (callStateRef.current !== "incoming") return;
+      try {
+        const res = await fetch(`/api/calls?session_id=${encodeURIComponent(sessionId)}`);
+        const data = await res.json();
+        const call = data?.call as { id?: string; contact_id?: string | null; contacts?: { full_name?: string } } | null;
+        if (call?.id) {
+          setCallRowId(call.id);
+          if (call.contact_id) {
+            setTarget((prev) => ({
+              number: prev?.number ?? "",
+              contactId: call.contact_id!,
+              contactName: call.contacts?.full_name,
+            }));
+          }
+          return;
+        }
+      } catch {
+        // fall through to retry
+      }
+    }
+  }, []);
+
   const handleCallUpdate = useCallback(
     (call: TelnyxCall) => {
       callRef.current = call;
@@ -131,6 +185,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
             setError(null);
             setCallState("incoming");
             setIsOpen(true);
+            const sessionId = call.telnyxIDs?.telnyxSessionId;
+            if (sessionId) resolveInboundCallRow(sessionId);
           } else {
             setCallState("ringing");
           }
@@ -167,7 +223,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [stopTimer],
+    [stopTimer, resolveInboundCallRow],
   );
 
   // Guards against the effect below being torn down (React StrictMode's
@@ -190,12 +246,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       return null;
     }
     if (generation !== generationRef.current) {
-      if (data.credentialId) {
-        fetch(`/api/calls/token?credentialId=${encodeURIComponent(data.credentialId)}`, {
-          method: "DELETE",
-          keepalive: true,
-        }).catch(() => {});
-      }
+      if (data.credentialId) releaseCredentialFetch(data.credentialId);
       return null;
     }
     ourNumberRef.current = data.callerNumber || null;
@@ -203,15 +254,14 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     credentialIdRef.current = data.credentialId || null;
     setTestCallerNumber(data.testCallerNumber || null);
 
-    const { TelnyxRTC } = await import("@telnyx/webrtc");
+    const [{ TelnyxRTC }, { RINGTONE_URL, RINGBACK_TONE_URL }] = await Promise.all([
+      import("@telnyx/webrtc"),
+      import("@/lib/dialer-tones"),
+    ]);
     if (generation !== generationRef.current) {
       const id = credentialIdRef.current;
       credentialIdRef.current = null;
-      if (id) {
-        fetch(`/api/calls/token?credentialId=${encodeURIComponent(id)}`, { method: "DELETE", keepalive: true }).catch(
-          () => {},
-        );
-      }
+      if (id) releaseCredentialFetch(id);
       return null;
     }
     const client = new TelnyxRTC({
@@ -244,11 +294,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     const id = credentialIdRef.current;
     if (!id) return;
     credentialIdRef.current = null;
-    // keepalive lets this survive a tab close/reload, when the browser would
-    // otherwise abort an in-flight fetch before it reaches the server.
-    fetch(`/api/calls/token?credentialId=${encodeURIComponent(id)}`, { method: "DELETE", keepalive: true }).catch(
-      () => {},
-    );
+    releaseCredentialFetch(id);
   }, []);
 
   // Connects as soon as the dashboard mounts so inbound calls ring even if
@@ -280,9 +326,20 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       return;
     }
     stopTimer();
-    callRef.current?.hangup();
+    // This path is reached specifically when the socket is disconnected —
+    // exactly when the underlying SDK call is most likely to throw on
+    // hangup(). Without the try/catch, that throw would skip every reset
+    // below it, leaving the panel stuck open (the failure mode this whole
+    // branch exists to avoid).
+    try {
+      callRef.current?.hangup();
+    } catch {
+      // already torn down — nothing to do
+    }
     callRef.current = null;
     setMuted(false);
+    setOnHold(false);
+    setRecordingState("stopped");
     setCallState("idle");
     setIsOpen(false);
     setDuration(0);
@@ -394,36 +451,70 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => stopTimer, [stopTimer]);
 
+  // Without this, every consumer of useDialer() re-renders on any render of
+  // DialerProvider for any reason (not just its own state changing), since a
+  // fresh object literal is a new reference every time. duration still
+  // ticks every second by design (it's real state the UI displays), but
+  // this stops that from being compounded by unrelated re-renders.
+  const value = useMemo<DialerContextValue>(
+    () => ({
+      target,
+      isOpen,
+      callState,
+      incoming,
+      duration,
+      muted,
+      onHold,
+      recordingState,
+      error,
+      callRowId,
+      connectionStatus,
+      testCallerNumber,
+      useTestCallerId,
+      setUseTestCallerId,
+      openDialer,
+      closeDialer,
+      placeCall,
+      answerIncoming,
+      declineIncoming,
+      hangUp,
+      toggleMute,
+      toggleHold,
+      toggleRecording,
+      sendDigits,
+      finishWrapUp,
+    }),
+    [
+      target,
+      isOpen,
+      callState,
+      incoming,
+      duration,
+      muted,
+      onHold,
+      recordingState,
+      error,
+      callRowId,
+      connectionStatus,
+      testCallerNumber,
+      useTestCallerId,
+      setUseTestCallerId,
+      openDialer,
+      closeDialer,
+      placeCall,
+      answerIncoming,
+      declineIncoming,
+      hangUp,
+      toggleMute,
+      toggleHold,
+      toggleRecording,
+      sendDigits,
+      finishWrapUp,
+    ],
+  );
+
   return (
-    <DialerContext.Provider
-      value={{
-        target,
-        isOpen,
-        callState,
-        incoming,
-        duration,
-        muted,
-        onHold,
-        recordingState,
-        error,
-        callRowId,
-        connectionStatus,
-        testCallerNumber,
-        useTestCallerId,
-        setUseTestCallerId,
-        openDialer,
-        closeDialer,
-        placeCall,
-        answerIncoming,
-        declineIncoming,
-        hangUp,
-        toggleMute,
-        toggleHold,
-        toggleRecording,
-        sendDigits,
-        finishWrapUp,
-      }}
-    >
+    <DialerContext.Provider value={value}>
       {children}
       {/* The SDK only plays incoming call audio if given a real element to attach
           the remote MediaStream to (client.newCall/call.answer's remoteElement

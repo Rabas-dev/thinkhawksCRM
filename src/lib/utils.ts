@@ -46,6 +46,16 @@ export function formatDuration(seconds: number | null | undefined) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/** Escapes text for safe interpolation into HTML — needed anywhere a value that isn't the agent's own typed text (e.g. contact fields, which can originate from an inbound email's From header) gets merged into outbound email HTML. */
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Normalizes a phone number to E.164-ish by stripping everything but digits and a leading +. */
 export function toE164(raw: string) {
   const trimmed = raw.trim();

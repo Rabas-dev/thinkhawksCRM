@@ -61,10 +61,14 @@ export async function POST(request: NextRequest) {
     }
   } else if (eventType === "message.sent" || eventType === "message.finalized") {
     const messageId = payload.id as string | undefined;
+    // message.finalized fires on successful delivery too, not just failure —
+    // don't default a missing/omitted status to "failed" and mislabel a
+    // message that actually went through. If we don't know, leave whatever
+    // status is already on the row alone rather than guessing wrong.
     const status =
       (payload.to as { status?: string }[] | undefined)?.[0]?.status ??
-      (eventType === "message.sent" ? "sent" : "failed");
-    if (!messageId) return NextResponse.json({ ok: true });
+      (eventType === "message.sent" ? "sent" : undefined);
+    if (!messageId || !status) return NextResponse.json({ ok: true });
 
     await supabase.from("messages").update({ status }).eq("telnyx_message_id", messageId);
   }

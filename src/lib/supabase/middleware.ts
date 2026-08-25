@@ -30,10 +30,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
-  const isPublic =
-    isAuthRoute ||
-    request.nextUrl.pathname.startsWith("/api/webhooks") ||
-    request.nextUrl.pathname.startsWith("/api/calls/twiml");
+  const isPublic = isAuthRoute || request.nextUrl.pathname.startsWith("/api/webhooks");
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

@@ -5,19 +5,23 @@ import { Mail } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
-import type { EmailTemplate } from "@/lib/types";
+import { renderTemplate } from "@/lib/templates";
+import type { Contact, EmailTemplate } from "@/lib/types";
 
 export function EmailDialog({
   open,
   onClose,
   contactId,
   contactEmail,
+  contact,
   onSent,
 }: {
   open: boolean;
   onClose: () => void;
   contactId: string;
   contactEmail: string | null;
+  /** Used to fill {{first_name}}/{{full_name}}/{{company}} tokens when a template is applied. */
+  contact: Pick<Contact, "full_name" | "company"> | null;
   onSent: () => void;
 }) {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -35,7 +39,11 @@ export function EmailDialog({
 
   function applyTemplate(id: string) {
     const t = templates.find((tpl) => tpl.id === id);
-    if (t) {
+    if (!t) return;
+    if (contact) {
+      setSubject(renderTemplate(t.subject, contact));
+      setBody(renderTemplate(t.body, contact));
+    } else {
       setSubject(t.subject);
       setBody(t.body);
     }
