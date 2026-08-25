@@ -40,11 +40,17 @@ export async function GET() {
       .delete()
       .lt("created_at", new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
       .then(() => {});
+    const { data: settings } = await supabase
+      .from("user_settings")
+      .select("default_caller_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
     return NextResponse.json({
       token,
       credentialId,
       callerNumber: TELNYX_NUMBER,
       testCallerNumber: TELNYX_TEST_NUMBER || null,
+      defaultUseTestCallerId: settings?.default_caller_id === "test",
     });
   } catch (err) {
     return NextResponse.json(

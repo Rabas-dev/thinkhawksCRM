@@ -27,6 +27,7 @@ export function EmailDialog({
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [signature, setSignature] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,18 +36,22 @@ export function EmailDialog({
     fetch("/api/email/templates")
       .then((r) => r.json())
       .then((d) => setTemplates(d.templates ?? []));
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => {
+        const sig: string = d.settings?.email_signature?.trim() || "";
+        setSignature(sig);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill a fresh compose with the agent's signature
+        if (sig) setBody((current) => current || `\n\n${sig}`);
+      });
   }, [open]);
 
   function applyTemplate(id: string) {
     const t = templates.find((tpl) => tpl.id === id);
     if (!t) return;
-    if (contact) {
-      setSubject(renderTemplate(t.subject, contact));
-      setBody(renderTemplate(t.body, contact));
-    } else {
-      setSubject(t.subject);
-      setBody(t.body);
-    }
+    const renderedBody = contact ? renderTemplate(t.body, contact) : t.body;
+    setSubject(contact ? renderTemplate(t.subject, contact) : t.subject);
+    setBody(signature ? `${renderedBody}\n\n${signature}` : renderedBody);
   }
 
   async function send(e: React.FormEvent) {

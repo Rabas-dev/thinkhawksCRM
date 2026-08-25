@@ -99,12 +99,16 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const [callRowId, setCallRowId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [testCallerNumber, setTestCallerNumber] = useState<string | null>(null);
-  // Persisted per-browser so an agent's choice sticks across reloads without
-  // affecting anyone else's session or the production default for new agents.
+  // Starts from the agent's Settings-page default (default_caller_id, fetched
+  // alongside the dialer token in getClient below); a per-browser override in
+  // localStorage — set only once this agent explicitly flips the checkbox
+  // here — takes precedence after that, so a quick in-call override doesn't
+  // require going back to Settings every time.
   const [useTestCallerId, setUseTestCallerIdState] = useState(false);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads a per-browser preference from storage on mount
-    setUseTestCallerIdState(localStorage.getItem("dialer:useTestCallerId") === "1");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reads a per-browser override from storage on mount
+    const stored = localStorage.getItem("dialer:useTestCallerId");
+    if (stored !== null) setUseTestCallerIdState(stored === "1");
   }, []);
   const setUseTestCallerId = useCallback((next: boolean) => {
     setUseTestCallerIdState(next);
@@ -253,6 +257,9 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     testNumberRef.current = data.testCallerNumber || null;
     credentialIdRef.current = data.credentialId || null;
     setTestCallerNumber(data.testCallerNumber || null);
+    if (localStorage.getItem("dialer:useTestCallerId") === null && data.defaultUseTestCallerId) {
+      setUseTestCallerIdState(true);
+    }
 
     const [{ TelnyxRTC }, { RINGTONE_URL, RINGBACK_TONE_URL }] = await Promise.all([
       import("@telnyx/webrtc"),

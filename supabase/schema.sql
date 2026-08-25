@@ -367,3 +367,19 @@ create policy "authenticated full access" on campaign_recipients
 drop policy if exists "authenticated full access" on emails;
 create policy "authenticated full access" on emails
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- Per-agent preferences (Settings page): display name, default outbound
+-- caller ID, and the email signature appended when composing. Scoped to
+-- the owning user, unlike the tables above — these are personal, not
+-- shared CRM data.
+create table if not exists user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  display_name text,
+  email_signature text,
+  default_caller_id text not null default 'main' check (default_caller_id in ('main', 'test')),
+  updated_at timestamptz not null default now()
+);
+alter table user_settings enable row level security;
+drop policy if exists "own settings only" on user_settings;
+create policy "own settings only" on user_settings
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
