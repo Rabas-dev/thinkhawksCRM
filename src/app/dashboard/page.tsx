@@ -107,7 +107,13 @@ export default async function DashboardPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge tone="muted">{a.type}</Badge>
-                    <span className="whitespace-nowrap text-[11px] text-muted">
+                    {/* Relative time computed at request time on the server will almost
+                        always differ from what the client computes moments later at
+                        hydration (worse on a host with a cold-start delay) — a classic
+                        React hydration-mismatch crash. suppressHydrationWarning is the
+                        correct fix for exactly this "value legitimately changes with
+                        time" case: React uses the client's value without erroring. */}
+                    <span className="whitespace-nowrap text-[11px] text-muted" suppressHydrationWarning>
                       {formatDistanceToNow(new Date(a.created_at), { addSuffix: true })}
                     </span>
                   </div>

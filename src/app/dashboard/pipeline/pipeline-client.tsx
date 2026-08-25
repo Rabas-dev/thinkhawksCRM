@@ -97,7 +97,7 @@ export function PipelineClient({ initialContacts }: { initialContacts: Contact[]
                       </div>
                     )}
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-[10px] text-muted">
+                      <span className="text-[10px] text-muted" suppressHydrationWarning>
                         {formatDistanceToNow(new Date(c.pipeline_updated_at), { addSuffix: true })}
                       </span>
                       <div className="flex gap-1">

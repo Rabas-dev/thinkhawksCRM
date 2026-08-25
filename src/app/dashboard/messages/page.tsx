@@ -87,7 +87,7 @@ export default function MessagesPage() {
                 </p>
                 <p className="truncate text-xs text-muted">{t.body}</p>
               </div>
-              <span className="shrink-0 text-[10px] text-muted">
+              <span className="shrink-0 text-[10px] text-muted" suppressHydrationWarning>
                 {formatDistanceToNow(new Date(t.created_at), { addSuffix: false })}
               </span>
             </button>
@@ -126,6 +126,7 @@ export default function MessagesPage() {
                         "mt-0.5 text-[10px]",
                         m.direction === "outbound" ? "text-white/70" : "text-muted",
                       )}
+                      suppressHydrationWarning
                     >
                       {format(new Date(m.created_at), "MMM d, h:mm a")} · {m.status}
                     </p>

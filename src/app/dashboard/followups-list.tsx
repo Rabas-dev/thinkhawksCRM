@@ -52,7 +52,7 @@ export function FollowUpsList({ tasks }: { tasks: FollowUpTask[] }) {
                 {contact?.company && <p className="truncate text-xs text-muted">{contact.company}</p>}
               </Link>
               <div className="flex shrink-0 items-center gap-2">
-                <Badge tone={overdue ? "danger" : "muted"}>
+                <Badge tone={overdue ? "danger" : "muted"} suppressHydrationWarning>
                   {overdue ? "Overdue" : format(new Date(t.due_at), "h:mm a")}
                 </Badge>
                 <button

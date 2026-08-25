@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { pauseRecording, resumeRecording, stopRecording } from "@/lib/telnyx";
+import { pauseRecording, resumeRecording, stopRecording, getRecordingUrl } from "@/lib/telnyx";
 
 /**
  * Streams a call recording through our own auth gate, so we never hand out
@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   const { data: call } = await supabase
     .from("calls")
-    .select("recording_url")
+    .select("recording_url, recording_id")
     .eq("id", id)
     .single();
 
@@ -24,7 +24,20 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "No recording available" }, { status: 404 });
   }
 
-  const upstream = await fetch(call.recording_url);
+  // The stored recording_url is an S3 presigned link that expires ~10
+  // minutes after the recording was saved — ask Telnyx for a fresh one
+  // rather than relying on it still being valid whenever this is played.
+  let playbackUrl = call.recording_url;
+  if (call.recording_id) {
+    try {
+      const fresh = await getRecordingUrl(call.recording_id);
+      if (fresh) playbackUrl = fresh;
+    } catch {
+      // Fall back to the possibly-stale stored URL — better than a hard failure.
+    }
+  }
+
+  const upstream = await fetch(playbackUrl);
 
   if (!upstream.ok || !upstream.body) {
     return NextResponse.json({ error: "Recording not available yet" }, { status: 502 });

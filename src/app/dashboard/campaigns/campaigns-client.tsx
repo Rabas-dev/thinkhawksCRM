@@ -56,7 +56,7 @@ export function CampaignsClient({ campaigns }: { campaigns: CampaignWithStats[] 
                   <span>{openRate}% opened</span>
                   <span>{clickRate}% clicked</span>
                 </div>
-                <span className="hidden shrink-0 text-xs text-muted md:block">
+                <span className="hidden shrink-0 text-xs text-muted md:block" suppressHydrationWarning>
                   {format(new Date(c.created_at), "MMM d, yyyy")}
                 </span>
                 <Badge tone={STATUS_TONE[c.status]} className="shrink-0">

@@ -183,6 +183,19 @@ export async function bridgeCalls(callControlIdA: string, callControlIdB: string
   });
 }
 
+/**
+ * Fetches a fresh presigned download URL for a saved recording. The URL we
+ * store at record time (call.recording.saved's recording_urls) is an S3
+ * presigned link that expires in ~10 minutes — playing it back any time
+ * after that 404s/403s forever unless we ask Telnyx for a new one.
+ */
+export async function getRecordingUrl(recordingId: string): Promise<string | null> {
+  const result = await telnyxRequest<{ data?: { download_urls?: { mp3?: string } } }>(
+    `/recordings/${recordingId}`,
+  );
+  return result?.data?.download_urls?.mp3 ?? null;
+}
+
 /** Starts recording a call, dual channel so agent + contact are separable. */
 export async function startRecording(callControlId: string) {
   await telnyxRequest(`/calls/${callControlId}/actions/record_start`, {

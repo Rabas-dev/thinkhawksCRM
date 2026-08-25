@@ -156,6 +156,7 @@ export function CalendarClient({ meetings, contacts }: { meetings: MeetingRow[];
                             "truncate rounded px-1 py-0.5 text-[10px] font-medium",
                             m.status === "canceled" ? "bg-danger/10 text-danger line-through" : "bg-primary/12 text-primary-dark",
                           )}
+                          suppressHydrationWarning
                         >
                           {format(new Date(m.start_at), "h:mma")} {m.title}
                         </p>
@@ -240,7 +241,7 @@ function MeetingCard({
           <Link href={`/dashboard/contacts/${meeting.contact_id}`} className="truncate text-xs text-primary-dark hover:underline">
             {contact?.full_name ?? "Unknown contact"}
           </Link>
-          <p className="mt-0.5 text-xs text-muted">{format(new Date(meeting.start_at), "MMM d, h:mm a")}</p>
+          <p className="mt-0.5 text-xs text-muted" suppressHydrationWarning>{format(new Date(meeting.start_at), "MMM d, h:mm a")}</p>
           {meeting.location && (
             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
               <MapPin size={11} /> {meeting.location}

@@ -173,7 +173,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm font-medium text-ink">{c.full_name}</p>
                     {c.lastEmail && (
-                      <span className="shrink-0 text-[10px] text-muted">
+                      <span className="shrink-0 text-[10px] text-muted" suppressHydrationWarning>
                         {formatDistanceToNow(new Date(c.lastEmail.created_at), { addSuffix: false })}
                       </span>
                     )}

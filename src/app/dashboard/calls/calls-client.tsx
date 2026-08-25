@@ -82,7 +82,7 @@ export function CallsClient({ calls }: { calls: CallRow[] }) {
                 </Link>
                 <p className="text-xs text-muted">{c.contact_phone}</p>
               </div>
-              <span className="hidden shrink-0 text-xs text-muted sm:block">
+              <span className="hidden shrink-0 text-xs text-muted sm:block" suppressHydrationWarning>
                 {format(new Date(c.created_at), "MMM d, h:mm a")}
               </span>
               <span className="w-12 shrink-0 text-right text-xs text-muted">

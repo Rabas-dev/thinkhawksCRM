@@ -393,7 +393,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
           <Field label="Company" value={contact.company} />
           <div>
             <p className="text-xs text-muted">Last contacted</p>
-            <p className="text-sm text-ink">
+            <p className="text-sm text-ink" suppressHydrationWarning>
               {lastContactedActivity
                 ? formatDistanceToNow(new Date(lastContactedActivity.created_at), { addSuffix: true })
                 : "—"}
@@ -433,7 +433,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm text-ink">{m.title}</p>
-                      <p className="text-xs text-muted">{format(new Date(m.start_at), "MMM d, h:mm a")}</p>
+                      <p className="text-xs text-muted" suppressHydrationWarning>{format(new Date(m.start_at), "MMM d, h:mm a")}</p>
                       {m.location && (
                         <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
                           <MapPin size={11} /> {m.location}
@@ -479,7 +479,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
                 <div key={t.id} className="flex items-center justify-between rounded-lg bg-section px-3 py-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm text-ink">{t.title}</p>
-                    <p className="text-xs text-muted">{format(new Date(t.due_at), "MMM d, h:mm a")}</p>
+                    <p className="text-xs text-muted" suppressHydrationWarning>{format(new Date(t.due_at), "MMM d, h:mm a")}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <button
@@ -560,7 +560,7 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
           <Badge tone={c.status === "completed" ? "success" : "muted"}>{c.status}</Badge>
         </div>
         {c.recording_url && <audio controls src={`/api/calls/${c.id}/recording`} className="mt-2 h-8 w-full" />}
-        <p className="mt-1.5 text-[10px] text-muted">{format(new Date(c.created_at), "MMM d, h:mm a")}</p>
+        <p className="mt-1.5 text-[10px] text-muted" suppressHydrationWarning>{format(new Date(c.created_at), "MMM d, h:mm a")}</p>
       </div>
     );
   }
@@ -576,7 +576,10 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
           )}
         >
           <p className="whitespace-pre-wrap">{m.body}</p>
-          <p className={cn("mt-1 text-[10px]", m.direction === "outbound" ? "text-white/70" : "text-muted")}>
+          <p
+            className={cn("mt-1 text-[10px]", m.direction === "outbound" ? "text-white/70" : "text-muted")}
+            suppressHydrationWarning
+          >
             {m.channel} · {format(new Date(m.created_at), "MMM d, h:mm a")} · {m.status}
           </p>
         </div>
@@ -597,7 +600,7 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
         {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
       </div>
       <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
-      <p className="mt-1.5 text-[10px] text-muted">
+      <p className="mt-1.5 text-[10px] text-muted" suppressHydrationWarning>
         {e.direction === "outbound" ? "You" : contact.full_name} · {format(new Date(e.created_at), "MMM d, h:mm a")}
       </p>
       {e.direction === "outbound" && item.events.length > 0 && (

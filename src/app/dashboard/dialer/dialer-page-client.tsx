@@ -98,7 +98,7 @@ export function DialerPageClient({ contacts }: { contacts: ContactRow[] }) {
                   <div className="flex items-center justify-between gap-2">
                     <p className="truncate text-sm font-medium text-ink">{c.full_name}</p>
                     {c.lastCall && (
-                      <span className="shrink-0 text-[10px] text-muted">
+                      <span className="shrink-0 text-[10px] text-muted" suppressHydrationWarning>
                         {formatDistanceToNow(new Date(c.lastCall.created_at), { addSuffix: false })}
                       </span>
                     )}
@@ -150,7 +150,7 @@ export function DialerPageClient({ contacts }: { contacts: ContactRow[] }) {
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary-dark">
                         {c.direction === "outbound" ? <PhoneOutgoing size={14} /> : <PhoneIncoming size={14} />}
                       </div>
-                      <span className="shrink-0 text-xs text-muted">{format(new Date(c.created_at), "MMM d, h:mm a")}</span>
+                      <span className="shrink-0 text-xs text-muted" suppressHydrationWarning>{format(new Date(c.created_at), "MMM d, h:mm a")}</span>
                       <span className="w-12 shrink-0 text-right text-xs text-muted">{formatDuration(c.duration_seconds)}</span>
                       {c.disposition && (
                         <Badge tone="primary" className="shrink-0">

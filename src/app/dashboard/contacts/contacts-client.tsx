@@ -199,7 +199,7 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
                     <span className="block max-w-[220px] truncate">{c.email || "—"}</span>
                   </td>
                   <td className="border-b border-border px-4 py-2.5 text-ink">{c.company || "—"}</td>
-                  <td className="border-b border-border px-4 py-2.5 whitespace-nowrap text-muted">
+                  <td className="border-b border-border px-4 py-2.5 whitespace-nowrap text-muted" suppressHydrationWarning>
                     {format(new Date(c.created_at), "MMM d, yyyy")}
                   </td>
                   <td className="border-b border-border px-4 py-2.5">
