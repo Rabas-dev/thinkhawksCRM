@@ -160,14 +160,18 @@ export async function mintWebrtcToken(credentialId: string): Promise<string> {
  * by its call_control_id, not the inbound call's session id) and bridge at
  * that point — see the voice webhook's call.answered handler.
  */
-export async function dialSipLeg(sipUsername: string): Promise<string> {
+export async function dialSipLeg(sipUsername: string, callerId?: string): Promise<string> {
   if (!TELNYX_CALL_CONTROL_APP_ID) throw new Error("TELNYX_CALL_CONTROL_APP_ID is not configured");
   const dialResult = await telnyxRequest<{ data?: { call_control_id?: string } }>("/calls", {
     method: "POST",
     body: {
       connection_id: TELNYX_CALL_CONTROL_APP_ID,
       to: `sip:${sipUsername}@sip.telnyx.com`,
-      from: TELNYX_NUMBER || undefined,
+      // Shows the actual caller in the browser's incoming-call popup —
+      // falls back to our own number only if we somehow don't have one
+      // (this itself must never be TELNYX_NUMBER, or the voice webhook's
+      // loop guard would mistake this leg's own echo for a real call).
+      from: callerId || TELNYX_NUMBER || undefined,
     },
   });
   const newLegId = dialResult?.data?.call_control_id;

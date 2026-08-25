@@ -8,6 +8,7 @@ import {
   hangup,
   startRingback,
   stopRingback,
+  TELNYX_NUMBER,
 } from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CallStatus } from "@/lib/types";
@@ -83,11 +84,12 @@ export async function POST(request: NextRequest) {
       // connection's side, also with direction "incoming" — without this
       // guard it gets mistaken for a brand-new real inbound call and
       // re-dials a bridge leg for itself, recursing until Telnyx's
-      // concurrent-call limit is hit. Only a real PSTN call has an E.164
-      // `to`; our own SIP URI dial doesn't.
-      const to = payload.to as string | undefined;
-      if (payload.direction === "incoming" && !to?.startsWith("sip:")) {
-        const from = payload.from as string;
+      // concurrent-call limit is hit. `payload.to` isn't reliable here (it
+      // comes back blank on that echo), but no real caller can ever have
+      // *our own* Telnyx number as their caller ID — only our own bridge
+      // dial sets `from` to that, so gate on that instead.
+      const from = payload.from as string;
+      if (payload.direction === "incoming" && from !== TELNYX_NUMBER) {
         let { data: contact } = await supabase
           .from("contacts")
           .select("id")
@@ -131,7 +133,7 @@ export async function POST(request: NextRequest) {
 
         if (session?.sip_username && insertedCall) {
           try {
-            const bridgeLegId = await dialSipLeg(session.sip_username);
+            const bridgeLegId = await dialSipLeg(session.sip_username, from);
             await supabase.from("calls").update({ bridge_leg_call_control_id: bridgeLegId }).eq("id", insertedCall.id);
           } catch (err) {
             // Debugging aid — this route runs on a host we can't tail logs on,
