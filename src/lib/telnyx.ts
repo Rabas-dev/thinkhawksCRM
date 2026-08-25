@@ -184,6 +184,22 @@ export async function bridgeCalls(callControlIdA: string, callControlIdB: string
 }
 
 /**
+ * Plays ringback tone to the caller. Telnyx does not generate this
+ * automatically once a call is under Call Control (which every inbound call
+ * here is, per the webhook on the Credential Connection) — without this the
+ * caller hears dead silence for the entire time we're dialing/waiting on
+ * the bridge leg, then just a disconnect if nobody answers in time.
+ */
+export async function startRingback(callControlId: string) {
+  await telnyxRequest(`/calls/${callControlId}/actions/ringback_start`, { method: "POST" });
+}
+
+/** Stops ringback — Telnyx normally stops it automatically once a call is bridged, but calling this explicitly avoids it bleeding into the connected audio if that doesn't happen. */
+export async function stopRingback(callControlId: string) {
+  await telnyxRequest(`/calls/${callControlId}/actions/ringback_stop`, { method: "POST" });
+}
+
+/**
  * Fetches a fresh presigned download URL for a saved recording. The URL we
  * store at record time (call.recording.saved's recording_urls) is an S3
  * presigned link that expires in ~10 minutes — playing it back any time

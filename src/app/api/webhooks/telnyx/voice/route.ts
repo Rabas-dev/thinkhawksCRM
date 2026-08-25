@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireWebhookToken, decodeClientState, startRecording, dialSipLeg, bridgeCalls, hangup } from "@/lib/telnyx";
+import {
+  requireWebhookToken,
+  decodeClientState,
+  startRecording,
+  dialSipLeg,
+  bridgeCalls,
+  hangup,
+  startRingback,
+  stopRingback,
+} from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { CallStatus } from "@/lib/types";
 
@@ -99,6 +108,12 @@ export async function POST(request: NextRequest) {
           .select("id")
           .single();
 
+        try {
+          await startRingback(payload.call_control_id as string);
+        } catch {
+          // Best-effort — the call proceeds silently for the caller if this fails.
+        }
+
         const { data: session } = await supabase
           .from("dialer_sessions")
           .select("sip_username")
@@ -159,6 +174,11 @@ export async function POST(request: NextRequest) {
         await supabase.from("calls").update({ bridge_leg_call_control_id: null }).eq("id", pendingBridge.id);
         try {
           await bridgeCalls(pendingBridge.telnyx_call_control_id, answeredCallControlId);
+          try {
+            await stopRingback(pendingBridge.telnyx_call_control_id);
+          } catch {
+            // Best-effort — Telnyx normally stops it automatically once bridged anyway.
+          }
           await supabase
             .from("calls")
             .update({ status: "in-progress", started_at: new Date().toISOString() })
