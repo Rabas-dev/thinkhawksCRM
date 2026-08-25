@@ -152,13 +152,15 @@ export async function mintWebrtcToken(credentialId: string): Promise<string> {
  * we have to do explicitly. `sipUsername` is the target session's Telephony
  * Credential sip_username (see createSessionCredential / dialer_sessions).
  *
- * `transfer` can't be used here — it only works on a call that's already
- * answered, and a fresh inbound call is still ringing. The correct pattern
- * is to dial a second leg to the browser session, then bridge it to the
- * still-ringing inbound leg; Telnyx handles the answer implicitly once the
- * browser picks up.
+ * This only dials the second leg — it does NOT bridge. `bridge`, like
+ * `transfer`, only works once the target leg is answered (confirmed against
+ * the live API: calling bridge right after dial fails with "This call
+ * can't receive bridge command because it has not been answered yet").
+ * The caller must wait for *this* leg's own call.answered event (matched
+ * by its call_control_id, not the inbound call's session id) and bridge at
+ * that point — see the voice webhook's call.answered handler.
  */
-export async function bridgeToSession(inboundCallControlId: string, sipUsername: string) {
+export async function dialSipLeg(sipUsername: string): Promise<string> {
   if (!TELNYX_CALL_CONTROL_APP_ID) throw new Error("TELNYX_CALL_CONTROL_APP_ID is not configured");
   const dialResult = await telnyxRequest<{ data?: { call_control_id?: string } }>("/calls", {
     method: "POST",
@@ -170,10 +172,14 @@ export async function bridgeToSession(inboundCallControlId: string, sipUsername:
   });
   const newLegId = dialResult?.data?.call_control_id;
   if (!newLegId) throw new Error("Telnyx didn't return a call_control_id for the dialed leg");
+  return newLegId;
+}
 
-  await telnyxRequest(`/calls/${inboundCallControlId}/actions/bridge`, {
+/** Bridges two already-answered call legs together. */
+export async function bridgeCalls(callControlIdA: string, callControlIdB: string) {
+  await telnyxRequest(`/calls/${callControlIdA}/actions/bridge`, {
     method: "POST",
-    body: { call_control_id: newLegId },
+    body: { call_control_id: callControlIdB },
   });
 }
 

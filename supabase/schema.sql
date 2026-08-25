@@ -83,6 +83,13 @@ end $$;
 
 alter table calls add column if not exists telnyx_call_session_id text;
 alter table calls add column if not exists started_at timestamptz;
+-- Set on an inbound call while its bridge leg (dialed to the connected
+-- browser session) is ringing but not yet answered; cleared once bridged.
+-- Lets the call.answered handler recognize "this event is for the bridge
+-- leg, not the primary call" and bridge at exactly the right moment
+-- (bridge only works on an already-answered leg — see dialSipLeg's comment
+-- in src/lib/telnyx.ts).
+alter table calls add column if not exists bridge_leg_call_control_id text;
 
 drop index if exists calls_sid_idx;
 create index if not exists calls_contact_idx on calls (contact_id, created_at desc);
