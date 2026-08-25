@@ -213,6 +213,28 @@ export async function POST(request: NextRequest) {
 
     case "call.hangup": {
       const sessionId = payload.call_session_id as string;
+      const hungupCallControlId = payload.call_control_id as string;
+
+      // Is this the bridge leg itself hanging up (e.g. the browser never
+      // answered, or Telnyx couldn't even ring it)? That leg has its own
+      // session_id distinct from the inbound call's, so it won't match the
+      // lookup below — catch it here and record why, since we can't tail
+      // logs on this host otherwise.
+      const { data: pendingBridgeHangup } = await supabase
+        .from("calls")
+        .select("id")
+        .eq("bridge_leg_call_control_id", hungupCallControlId)
+        .maybeSingle();
+      if (pendingBridgeHangup) {
+        await supabase
+          .from("calls")
+          .update({
+            bridge_leg_call_control_id: null,
+            notes: `bridge leg hung up before answering: cause=${payload.hangup_cause ?? "unknown"} sip_code=${payload.sip_hangup_cause ?? "?"}`,
+          })
+          .eq("id", pendingBridgeHangup.id);
+      }
+
       const { data: call } = await supabase
         .from("calls")
         .select("id, contact_id, direction, contact_phone, status, started_at, bridge_leg_call_control_id")
