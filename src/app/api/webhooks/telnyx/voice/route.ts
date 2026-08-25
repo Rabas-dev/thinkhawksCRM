@@ -78,7 +78,15 @@ export async function POST(request: NextRequest) {
 
   switch (eventType) {
     case "call.initiated": {
-      if (payload.direction === "incoming") {
+      // The bridge leg dialed by dialSipLeg (sip:{username}@sip.telnyx.com)
+      // fires its own call.initiated webhook from the credential
+      // connection's side, also with direction "incoming" — without this
+      // guard it gets mistaken for a brand-new real inbound call and
+      // re-dials a bridge leg for itself, recursing until Telnyx's
+      // concurrent-call limit is hit. Only a real PSTN call has an E.164
+      // `to`; our own SIP URI dial doesn't.
+      const to = payload.to as string | undefined;
+      if (payload.direction === "incoming" && !to?.startsWith("sip:")) {
         const from = payload.from as string;
         let { data: contact } = await supabase
           .from("contacts")
