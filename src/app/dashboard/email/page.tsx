@@ -13,12 +13,13 @@ export default async function EmailPage() {
       .order("full_name", { ascending: true }),
     supabase
       .from("emails")
-      .select("contact_id, to_address, subject, text_body, direction, status, created_at")
+      .select("id, contact_id, to_address, subject, text_body, direction, status, created_at")
       .order("created_at", { ascending: false })
       .limit(500),
   ]);
 
   type EmailSummary = {
+    id: string;
     contact_id: string | null;
     to_address: string | null;
     subject: string | null;
@@ -68,9 +69,27 @@ export default async function EmailPage() {
     return an.localeCompare(bn);
   });
 
+  const contactNameById = new Map((contacts ?? []).map((c) => [c.id, c.full_name]));
+  // Every individual outbound email, flattened and reverse-chronological —
+  // the sidebar only ever shows the *latest* email per contact/address, so
+  // there was no way to see full send history without clicking into each
+  // thread one at a time.
+  const sentLog = (recentEmails ?? [])
+    .filter((e) => e.direction === "outbound")
+    .map((e) => ({
+      id: e.id,
+      contact_id: e.contact_id,
+      recipient: (e.contact_id && contactNameById.get(e.contact_id)) || e.to_address || "Unknown",
+      to_address: e.to_address,
+      subject: e.subject,
+      snippet: e.text_body,
+      status: e.status,
+      created_at: e.created_at,
+    }));
+
   return (
     <Suspense fallback={null}>
-      <EmailPageClient rows={rows} />
+      <EmailPageClient rows={rows} sentLog={sentLog} />
     </Suspense>
   );
 }

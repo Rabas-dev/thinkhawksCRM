@@ -32,6 +32,18 @@ export type SidebarRow =
   | { kind: "contact"; id: string; full_name: string; email: string | null; company: string | null; lastEmail: EmailSummary | null }
   | { kind: "quick"; address: string; lastEmail: EmailSummary | null };
 
+/** One row of the flat "Sent" log — every individual outbound email, not just the latest per contact/address. */
+export type SentLogRow = {
+  id: string;
+  contact_id: string | null;
+  recipient: string;
+  to_address: string | null;
+  subject: string | null;
+  snippet: string | null;
+  status: string;
+  created_at: string;
+};
+
 const STATUS_TONE: Record<string, "muted" | "success" | "primary" | "danger" | "warning"> = {
   queued: "muted",
   sent: "primary",
@@ -83,11 +95,12 @@ function TrackingTimeline({ events }: { events: EmailEvent[] }) {
   );
 }
 
-export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
+export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarRow[]; sentLog: SentLogRow[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [q, setQ] = useState("");
+  const [view, setView] = useState<"threads" | "sent">("threads");
   const [composeOpen, setComposeOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("contact"));
   const [quickTo, setQuickTo] = useState<string | null>(null);
@@ -193,6 +206,21 @@ export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
     return r.full_name.toLowerCase().includes(s) || r.company?.toLowerCase().includes(s) || r.email?.toLowerCase().includes(s);
   });
 
+  const filteredSentLog = sentLog.filter((r) => {
+    if (!q) return true;
+    const s = q.toLowerCase();
+    return (
+      r.recipient.toLowerCase().includes(s) ||
+      r.to_address?.toLowerCase().includes(s) ||
+      r.subject?.toLowerCase().includes(s)
+    );
+  });
+
+  function openSentLogEntry(row: SentLogRow) {
+    if (row.contact_id) selectContact(row.contact_id);
+    else if (row.to_address) openQuickThread(row.to_address);
+  }
+
   return (
     <div className="flex h-screen">
       <div className="flex w-80 shrink-0 flex-col border-r border-border bg-surface">
@@ -205,11 +233,57 @@ export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
           </div>
           <div className="relative mt-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search contacts…" className="pl-8" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={view === "threads" ? "Search contacts…" : "Search sent emails…"}
+              className="pl-8"
+            />
+          </div>
+          <div className="mt-3 flex gap-1 rounded-lg bg-section p-1">
+            {(["threads", "sent"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={cn(
+                  "flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition cursor-pointer",
+                  view === v ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink",
+                )}
+              >
+                {v === "threads" ? "Threads" : "All sent"}
+              </button>
+            ))}
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {filtered.length === 0 ? (
+          {view === "sent" ? (
+            filteredSentLog.length === 0 ? (
+              <p className="p-6 text-center text-sm text-muted">No emails sent yet.</p>
+            ) : (
+              filteredSentLog.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => openSentLogEntry(r)}
+                  className="flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left cursor-pointer hover:bg-section"
+                >
+                  <Avatar name={r.recipient} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-ink">{r.recipient}</p>
+                      <span className="shrink-0 text-[10px] text-muted" suppressHydrationWarning>
+                        {formatDistanceToNow(new Date(r.created_at), { addSuffix: false })}
+                      </span>
+                    </div>
+                    <p className="flex items-center gap-1 truncate text-xs text-muted">
+                      <OpenedIndicator status={r.status} />
+                      <span className="truncate">{r.subject || "(no subject)"}</span>
+                    </p>
+                  </div>
+                </button>
+              ))
+            )
+          ) : filtered.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted">No emails yet.</p>
           ) : (
             filtered.map((r) => {
