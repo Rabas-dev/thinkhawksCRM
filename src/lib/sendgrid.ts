@@ -16,19 +16,18 @@ export function getSendgrid() {
 export const EMAIL_FROM = process.env.SENDGRID_FROM_EMAIL || "crm@thinkhawks.com";
 
 /**
- * Every outbound send should spread this in. Two concrete deliverability
- * fixes, not stylistic ones:
- *  - clickTracking is off: SendGrid's link branding for this domain
- *    (url3151.thinkhawks.com) has invalid/missing DNS records, so with
- *    tracking on, every link in the email gets rewritten to route through
- *    an *unbranded* sendgrid.net redirect — a strong, well-documented spam
- *    signal (a link whose visible domain doesn't match where it actually
- *    goes). Once that CNAME is added and validates, this can flip back on.
+ * Every outbound send should spread this in.
+ *  - clickTracking is on: SendGrid's Link Branding for this domain
+ *    (url3151.thinkhawks.com / 112691635.thinkhawks.com) is now validated,
+ *    so tracked links route through a branded thinkhawks.com subdomain
+ *    instead of a bare sendgrid.net redirect — the latter was a strong,
+ *    well-documented spam signal (a link whose visible domain doesn't
+ *    match where it actually goes) while those CNAMEs were still missing.
  *  - openTracking stays on — it's an invisible pixel, not a link rewrite,
  *    and the "opened" indicator in the Email UI depends on it.
  */
 export const DELIVERABILITY_TRACKING_SETTINGS = {
-  clickTracking: { enable: false, enableText: false },
+  clickTracking: { enable: true, enableText: false },
   openTracking: { enable: true },
 } as const;
 
