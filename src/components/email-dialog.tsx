@@ -6,6 +6,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { AttachmentButton, AttachmentChips, type PendingAttachment } from "@/components/attachment-field";
+import { sendEmail } from "@/lib/send-email";
 import { renderTemplate } from "@/lib/templates";
 import type { Contact, EmailTemplate } from "@/lib/types";
 
@@ -64,15 +65,10 @@ export function EmailDialog({
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contact_id: contactId, subject, body, from_name: fromName, attachments }),
-    });
+    const result = await sendEmail({ contact_id: contactId, subject, body, from_name: fromName, attachments });
     setLoading(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Couldn't send that email.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     setSubject("");

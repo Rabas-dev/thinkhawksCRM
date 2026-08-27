@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Dialog } from "@/components/ui/dialog";
 import { AttachmentButton, AttachmentChips, type PendingAttachment } from "@/components/attachment-field";
 import { format, formatDistanceToNow } from "date-fns";
+import { sendEmail } from "@/lib/send-email";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
 
@@ -165,19 +166,14 @@ export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
     if (!body.trim() || !subject.trim()) return;
     setSending(true);
     setError(null);
-    const res = await fetch("/api/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        selectedId
-          ? { contact_id: selectedId, subject, body, from_name: fromName, attachments }
-          : { to: quickTo, subject, body, from_name: fromName, attachments },
-      ),
-    });
+    const result = await sendEmail(
+      selectedId
+        ? { contact_id: selectedId, subject, body, from_name: fromName, attachments }
+        : { to: quickTo, subject, body, from_name: fromName, attachments },
+    );
     setSending(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Couldn't send that email.");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     if (selectedId) {
