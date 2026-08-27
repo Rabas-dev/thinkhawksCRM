@@ -24,7 +24,10 @@ const attachmentSchema = z.object({
 // address always stays EMAIL_FROM (the domain-authenticated sender SPF/DKIM
 // pass for), this just changes what's displayed alongside it. No CR/LF, so
 // it can't be used to inject extra headers into the outgoing message.
-const fromNameSchema = z.string().trim().min(1).max(100).regex(/^[^\r\n]*$/);
+// Allowed empty (no min length) — every compose form always sends this key,
+// blank when the agent has no Settings display name and hasn't typed one;
+// the route falls back to a default rather than rejecting the whole send.
+const fromNameSchema = z.string().trim().max(100).regex(/^[^\r\n]*$/);
 
 const attachmentsField = z.array(attachmentSchema).max(10).optional();
 
