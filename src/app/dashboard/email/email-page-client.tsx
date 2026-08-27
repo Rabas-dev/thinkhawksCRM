@@ -14,13 +14,22 @@ import { format, formatDistanceToNow } from "date-fns";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
 
-type ContactRow = {
-  id: string;
-  full_name: string;
-  email: string | null;
-  company: string | null;
-  lastEmail: { subject: string | null; text_body: string | null; direction: "outbound" | "inbound"; status: string; created_at: string } | null;
+type EmailSummary = {
+  subject: string | null;
+  text_body: string | null;
+  direction: "outbound" | "inbound";
+  status: string;
+  created_at: string;
 };
+
+/**
+ * A sidebar row is either a saved contact (the normal case) or a "quick"
+ * row — a recipient from Compose's "just send, don't save" option, who has
+ * no contact record and so is keyed by raw email address instead of an id.
+ */
+export type SidebarRow =
+  | { kind: "contact"; id: string; full_name: string; email: string | null; company: string | null; lastEmail: EmailSummary | null }
+  | { kind: "quick"; address: string; lastEmail: EmailSummary | null };
 
 const STATUS_TONE: Record<string, "muted" | "success" | "primary" | "danger" | "warning"> = {
   queued: "muted",
@@ -73,7 +82,7 @@ function TrackingTimeline({ events }: { events: EmailEvent[] }) {
   );
 }
 
-export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
+export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -89,7 +98,6 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [quickSent, setQuickSent] = useState(false);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
 
@@ -111,6 +119,13 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     setAttachments([]);
   }, []);
 
+  const loadQuickThread = useCallback(async (email: string) => {
+    const res = await fetch(`/api/email/quick-thread?to=${encodeURIComponent(email)}`);
+    const data = await res.json();
+    setEmails(data.emails ?? []);
+    setEvents([]);
+  }, []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the newly selected contact's thread
     if (selectedId) loadThread(selectedId);
@@ -122,14 +137,15 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     router.replace(`/dashboard/email?contact=${id}`, { scroll: false });
   }
 
-  function startQuickCompose(email: string) {
+  /** Opens (or re-opens, from the sidebar) the compose+history pane for a recipient with no saved contact. */
+  function openQuickThread(email: string) {
     setSelectedId(null);
     setQuickTo(email);
     setSubject("");
     setBody("");
     setAttachments([]);
     setError(null);
-    setQuickSent(false);
+    loadQuickThread(email);
     router.replace("/dashboard/email", { scroll: false });
   }
 
@@ -160,18 +176,19 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     }
     if (selectedId) {
       loadThread(selectedId);
-    } else {
+    } else if (quickTo) {
       setSubject("");
       setBody("");
       setAttachments([]);
-      setQuickSent(true);
+      loadQuickThread(quickTo);
     }
   }
 
-  const filtered = contacts.filter((c) => {
+  const filtered = sidebarRows.filter((r) => {
     if (!q) return true;
     const s = q.toLowerCase();
-    return c.full_name.toLowerCase().includes(s) || c.company?.toLowerCase().includes(s) || c.email?.toLowerCase().includes(s);
+    if (r.kind === "quick") return r.address.toLowerCase().includes(s);
+    return r.full_name.toLowerCase().includes(s) || r.company?.toLowerCase().includes(s) || r.email?.toLowerCase().includes(s);
   });
 
   return (
@@ -191,34 +208,41 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
         </div>
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">No contacts with an email yet.</p>
+            <p className="p-6 text-center text-sm text-muted">No emails yet.</p>
           ) : (
-            filtered.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => selectContact(c.id)}
-                className={cn(
-                  "flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left cursor-pointer",
-                  selectedId === c.id ? "bg-primary/10" : "hover:bg-section",
-                )}
-              >
-                <Avatar name={c.full_name} size={36} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-ink">{c.full_name}</p>
-                    {c.lastEmail && (
-                      <span className="shrink-0 text-[10px] text-muted" suppressHydrationWarning>
-                        {formatDistanceToNow(new Date(c.lastEmail.created_at), { addSuffix: false })}
+            filtered.map((r) => {
+              const name = r.kind === "contact" ? r.full_name : r.address;
+              const isActive = r.kind === "contact" ? selectedId === r.id : quickTo === r.address;
+              return (
+                <button
+                  key={r.kind === "contact" ? r.id : `quick:${r.address}`}
+                  onClick={() => (r.kind === "contact" ? selectContact(r.id) : openQuickThread(r.address))}
+                  className={cn(
+                    "flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left cursor-pointer",
+                    isActive ? "bg-primary/10" : "hover:bg-section",
+                  )}
+                >
+                  <Avatar name={name} size={36} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-ink">{name}</p>
+                      {r.lastEmail && (
+                        <span className="shrink-0 text-[10px] text-muted" suppressHydrationWarning>
+                          {formatDistanceToNow(new Date(r.lastEmail.created_at), { addSuffix: false })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="flex items-center gap-1 truncate text-xs text-muted">
+                      {r.lastEmail?.direction === "outbound" && <OpenedIndicator status={r.lastEmail.status} />}
+                      <span className="truncate">
+                        {r.lastEmail ? r.lastEmail.subject || "(no subject)" : r.kind === "contact" ? r.email : r.address}
                       </span>
-                    )}
+                      {r.kind === "quick" && <span className="shrink-0 text-[10px] text-muted">· not saved</span>}
+                    </p>
                   </div>
-                  <p className="flex items-center gap-1 truncate text-xs text-muted">
-                    {c.lastEmail?.direction === "outbound" && <OpenedIndicator status={c.lastEmail.status} />}
-                    <span className="truncate">{c.lastEmail ? c.lastEmail.subject || "(no subject)" : c.email}</span>
-                  </p>
-                </div>
-              </button>
-            ))
+                </button>
+              );
+            })
           )}
         </div>
       </div>
@@ -241,53 +265,47 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-5">
-              {selectedId ? (
-                emails.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-muted">No emails in this thread yet — send the first one below.</p>
-                ) : (
-                  emails.map((e) => {
-                    const relatedEvents = e.resend_email_id
-                      ? events.filter((ev) => ev.resend_email_id === e.resend_email_id)
-                      : [];
-                    return (
-                      <div
-                        key={e.id}
-                        className={cn(
-                          "max-w-[80%] rounded-xl border border-border bg-surface p-3",
-                          e.direction === "outbound" ? "ml-auto" : "mr-auto",
-                        )}
-                      >
-                        <div className="mb-1 flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-ink">{e.subject || "(no subject)"}</p>
-                          {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
-                        </div>
-                        <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
-                        {e.attachments?.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1.5">
-                            {e.attachments.map((a, i) => (
-                              <span
-                                key={`${a.filename}-${i}`}
-                                className="flex items-center gap-1 rounded-md border border-border bg-section px-2 py-0.5 text-[10px] text-muted"
-                              >
-                                📎 {a.filename}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
-                          {e.direction === "outbound" ? "You" : activeContact?.full_name} ·{" "}
-                          {format(new Date(e.created_at), "MMM d, h:mm a")}
-                          {e.direction === "outbound" && <OpenedIndicator status={e.status} />}
-                        </p>
-                        {e.direction === "outbound" && <TrackingTimeline events={relatedEvents} />}
-                      </div>
-                    );
-                  })
-                )
+              {emails.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted">No emails in this thread yet — send the first one below.</p>
               ) : (
-                <p className="py-6 text-center text-sm text-muted">
-                  {quickSent ? "Sent — not saved to Contacts, so there's no thread to show here." : "Not saved to Contacts — compose below and send."}
-                </p>
+                emails.map((e) => {
+                  const relatedEvents = e.resend_email_id
+                    ? events.filter((ev) => ev.resend_email_id === e.resend_email_id)
+                    : [];
+                  return (
+                    <div
+                      key={e.id}
+                      className={cn(
+                        "max-w-[80%] rounded-xl border border-border bg-surface p-3",
+                        e.direction === "outbound" ? "ml-auto" : "mr-auto",
+                      )}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-ink">{e.subject || "(no subject)"}</p>
+                        {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
+                      </div>
+                      <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
+                      {e.attachments?.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {e.attachments.map((a, i) => (
+                            <span
+                              key={`${a.filename}-${i}`}
+                              className="flex items-center gap-1 rounded-md border border-border bg-section px-2 py-0.5 text-[10px] text-muted"
+                            >
+                              📎 {a.filename}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
+                        {e.direction === "outbound" ? "You" : (selectedId ? activeContact?.full_name : quickTo)} ·{" "}
+                        {format(new Date(e.created_at), "MMM d, h:mm a")}
+                        {e.direction === "outbound" && <OpenedIndicator status={e.status} />}
+                      </p>
+                      {e.direction === "outbound" && <TrackingTimeline events={relatedEvents} />}
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -343,7 +361,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
         }}
         onQuickPicked={(email) => {
           setComposeOpen(false);
-          startQuickCompose(email);
+          openQuickThread(email);
         }}
       />
     </div>
