@@ -30,18 +30,19 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Gmail-style attach-files control: a paperclip button plus removable chips for whatever's queued. Shared by every compose surface (contact email dialog, Email page thread/quick-compose). */
-export function AttachmentField({
-  attachments,
-  onChange,
-  error,
-  onError,
-}: {
+type AttachmentControlProps = {
   attachments: PendingAttachment[];
   onChange: (next: PendingAttachment[]) => void;
-  error?: string | null;
   onError?: (message: string | null) => void;
-}) {
+};
+
+/**
+ * Gmail-style attach-files trigger — an icon-only button meant to sit
+ * alongside Send, not its own row. Pair with AttachmentChips (rendered
+ * wherever fits the layout) to show what's queued; both share the same
+ * `attachments`/`onChange` state from the parent form.
+ */
+export function AttachmentButton({ attachments, onChange, onError }: AttachmentControlProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFiles(fileList: FileList | null) {
@@ -66,34 +67,44 @@ export function AttachmentField({
   }
 
   return (
+    <>
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        title="Attach files"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-ink hover:bg-section cursor-pointer"
+      >
+        <Paperclip size={15} />
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+    </>
+  );
+}
+
+/** Removable chips for whatever AttachmentButton has queued — render separately from the button itself so the button can sit next to Send while chips sit above/below the message field. */
+export function AttachmentChips({
+  attachments,
+  onChange,
+  error,
+}: {
+  attachments: PendingAttachment[];
+  onChange: (next: PendingAttachment[]) => void;
+  error?: string | null;
+}) {
+  if (attachments.length === 0 && !error) return null;
+  return (
     <div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-ink hover:bg-section cursor-pointer"
-        >
-          <Paperclip size={13} /> Attach
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={(e) => {
-            handleFiles(e.target.files);
-            e.target.value = "";
-          }}
-        />
-        {attachments.length > 0 && (
-          <span className="text-[11px] text-muted">
-            {attachments.length} file{attachments.length > 1 ? "s" : ""} ·{" "}
-            {formatSize(attachments.reduce((sum, a) => sum + a.size, 0))}
-          </span>
-        )}
-      </div>
       {attachments.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {attachments.map((a, i) => (
             <span
               key={`${a.filename}-${i}`}

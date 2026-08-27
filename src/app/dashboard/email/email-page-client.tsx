@@ -9,7 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Dialog } from "@/components/ui/dialog";
-import { AttachmentField, type PendingAttachment } from "@/components/attachment-field";
+import { AttachmentButton, AttachmentChips, type PendingAttachment } from "@/components/attachment-field";
 import { format, formatDistanceToNow } from "date-fns";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
@@ -312,7 +312,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                 placeholder="Subject"
                 className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <AttachmentField attachments={attachments} onChange={setAttachments} error={attachError} onError={setAttachError} />
+              <AttachmentChips attachments={attachments} onChange={setAttachments} error={attachError} />
               <div className="flex gap-2">
                 <textarea
                   value={body}
@@ -321,9 +321,12 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                   rows={3}
                   className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
-                <Button type="submit" size="icon" disabled={sending} className="self-end">
-                  <Send size={15} />
-                </Button>
+                <div className="flex flex-col justify-end gap-2">
+                  <AttachmentButton attachments={attachments} onChange={setAttachments} onError={setAttachError} />
+                  <Button type="submit" size="icon" disabled={sending}>
+                    <Send size={15} />
+                  </Button>
+                </div>
               </div>
               {error && <p className="text-sm text-danger">{error}</p>}
             </form>

@@ -5,7 +5,7 @@ import { Mail } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
-import { AttachmentField, type PendingAttachment } from "@/components/attachment-field";
+import { AttachmentButton, AttachmentChips, type PendingAttachment } from "@/components/attachment-field";
 import { renderTemplate } from "@/lib/templates";
 import type { Contact, EmailTemplate } from "@/lib/types";
 
@@ -111,11 +111,14 @@ export function EmailDialog({
           <Label>Message</Label>
           <Textarea required rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
         </div>
-        <AttachmentField attachments={attachments} onChange={setAttachments} error={attachError} onError={setAttachError} />
+        <AttachmentChips attachments={attachments} onChange={setAttachments} error={attachError} />
         {error && <p className="text-sm text-danger">{error}</p>}
-        <Button type="submit" disabled={loading || !contactEmail} className="w-full justify-center">
-          <Mail size={15} /> {loading ? "Sending…" : "Send email"}
-        </Button>
+        <div className="flex gap-2">
+          <AttachmentButton attachments={attachments} onChange={setAttachments} onError={setAttachError} />
+          <Button type="submit" disabled={loading || !contactEmail} className="flex-1 justify-center">
+            <Mail size={15} /> {loading ? "Sending…" : "Send email"}
+          </Button>
+        </div>
       </form>
     </Dialog>
   );
