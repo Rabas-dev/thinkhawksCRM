@@ -15,6 +15,39 @@ export function getSendgrid() {
 
 export const EMAIL_FROM = process.env.SENDGRID_FROM_EMAIL || "crm@thinkhawks.com";
 
+/**
+ * Every outbound send should spread this in. Two concrete deliverability
+ * fixes, not stylistic ones:
+ *  - clickTracking is off: SendGrid's link branding for this domain
+ *    (url3151.thinkhawks.com) has invalid/missing DNS records, so with
+ *    tracking on, every link in the email gets rewritten to route through
+ *    an *unbranded* sendgrid.net redirect — a strong, well-documented spam
+ *    signal (a link whose visible domain doesn't match where it actually
+ *    goes). Once that CNAME is added and validates, this can flip back on.
+ *  - openTracking stays on — it's an invisible pixel, not a link rewrite,
+ *    and the "opened" indicator in the Email UI depends on it.
+ */
+export const DELIVERABILITY_TRACKING_SETTINGS = {
+  clickTracking: { enable: false, enableText: false },
+  openTracking: { enable: true },
+} as const;
+
+/** Naive HTML→text: strips tags for the required plain-text MIME part. Good enough for the simple <p>/<div> markup this app generates — not a general-purpose sanitizer. */
+export function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function isSendgridConfigError(err: unknown): boolean {
   return err instanceof Error && err.message === "SENDGRID_API_KEY is not configured";
 }

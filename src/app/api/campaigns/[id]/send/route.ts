@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getSendgrid, EMAIL_FROM, wrapEmailHtml, isSendgridConfigError, firstSendgridHeader } from "@/lib/sendgrid";
+import {
+  getSendgrid,
+  EMAIL_FROM,
+  wrapEmailHtml,
+  isSendgridConfigError,
+  firstSendgridHeader,
+  DELIVERABILITY_TRACKING_SETTINGS,
+} from "@/lib/sendgrid";
 import { renderTemplate } from "@/lib/templates";
 
 const CHUNK_SIZE = 100;
@@ -79,15 +86,18 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     // SendGrid's Mail Send API sends one message per call — fire the batch
     // as individual sends in parallel rather than Resend's single batch call.
     const results = await Promise.allSettled(
-      batch.map((contact) =>
-        sgMail.send({
+      batch.map((contact) => {
+        const text = renderTemplate(campaign.body, contact);
+        return sgMail.send({
           from: EMAIL_FROM,
           to: contact.email!,
           subject: renderTemplate(campaign.subject, contact),
-          html: wrapEmailHtml(renderTemplate(campaign.body, contact)),
+          html: wrapEmailHtml(text),
+          text,
+          trackingSettings: DELIVERABILITY_TRACKING_SETTINGS,
           customArgs: { contact_id: contact.id, campaign_id: id },
-        }),
-      ),
+        });
+      }),
     );
 
     // Each recipient's outcome only needs to update local arrays here — the

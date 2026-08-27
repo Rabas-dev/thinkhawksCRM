@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { getSendgrid, EMAIL_FROM, meetingEmailHtml } from "@/lib/sendgrid";
+import { getSendgrid, EMAIL_FROM, meetingEmailHtml, htmlToPlainText, DELIVERABILITY_TRACKING_SETTINGS } from "@/lib/sendgrid";
 import { escapeHtml } from "@/lib/utils";
 
 const updateSchema = z.object({
@@ -55,24 +55,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const whenLabel = format(new Date(meeting.start_at), "EEEE, MMM d 'at' h:mm a");
     try {
       const sgMail = getSendgrid();
+      const html = meetingEmailHtml({
+        heading: canceled ? "Your meeting has been canceled" : "Your meeting was rescheduled",
+        intro: `Hi ${escapeHtml(contact.full_name.split(" ")[0])}, ${
+          canceled
+            ? "the meeting below has been canceled."
+            : "here are the updated details for your meeting with Think Hawks."
+        }`,
+        title: meeting.title,
+        whenLabel,
+        location: meeting.location,
+        meetingLink: meeting.meeting_link,
+        description: meeting.description,
+        canceled,
+      });
       await sgMail.send({
         from: EMAIL_FROM,
         to: contact.email,
         subject: canceled ? `Meeting canceled: ${meeting.title}` : `Meeting rescheduled: ${meeting.title}`,
-        html: meetingEmailHtml({
-          heading: canceled ? "Your meeting has been canceled" : "Your meeting was rescheduled",
-          intro: `Hi ${escapeHtml(contact.full_name.split(" ")[0])}, ${
-            canceled
-              ? "the meeting below has been canceled."
-              : "here are the updated details for your meeting with Think Hawks."
-          }`,
-          title: meeting.title,
-          whenLabel,
-          location: meeting.location,
-          meetingLink: meeting.meeting_link,
-          description: meeting.description,
-          canceled,
-        }),
+        html,
+        text: htmlToPlainText(html),
+        trackingSettings: DELIVERABILITY_TRACKING_SETTINGS,
         customArgs: { meeting_id: meeting.id },
       });
     } catch {

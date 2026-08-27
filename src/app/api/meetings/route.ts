@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
-import { getSendgrid, EMAIL_FROM, meetingEmailHtml, isSendgridConfigError, sendgridErrorMessage, firstSendgridHeader } from "@/lib/sendgrid";
+import {
+  getSendgrid,
+  EMAIL_FROM,
+  meetingEmailHtml,
+  isSendgridConfigError,
+  sendgridErrorMessage,
+  firstSendgridHeader,
+  htmlToPlainText,
+  DELIVERABILITY_TRACKING_SETTINGS,
+} from "@/lib/sendgrid";
 import { escapeHtml } from "@/lib/utils";
 
 const createSchema = z
@@ -98,19 +107,22 @@ export async function POST(request: NextRequest) {
   if (contact.email) {
     try {
       const sgMail = getSendgrid();
+      const html = meetingEmailHtml({
+        heading: "Your meeting is confirmed",
+        intro: `Hi ${escapeHtml(contact.full_name.split(" ")[0])}, this confirms your upcoming meeting with Think Hawks.`,
+        title: meeting.title,
+        whenLabel,
+        location: meeting.location,
+        meetingLink: meeting.meeting_link,
+        description: meeting.description,
+      });
       const [response] = await sgMail.send({
         from: EMAIL_FROM,
         to: contact.email,
         subject: `Meeting confirmed: ${meeting.title}`,
-        html: meetingEmailHtml({
-          heading: "Your meeting is confirmed",
-          intro: `Hi ${escapeHtml(contact.full_name.split(" ")[0])}, this confirms your upcoming meeting with Think Hawks.`,
-          title: meeting.title,
-          whenLabel,
-          location: meeting.location,
-          meetingLink: meeting.meeting_link,
-          description: meeting.description,
-        }),
+        html,
+        text: htmlToPlainText(html),
+        trackingSettings: DELIVERABILITY_TRACKING_SETTINGS,
         customArgs: { meeting_id: meeting.id },
       });
 

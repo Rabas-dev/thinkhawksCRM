@@ -8,6 +8,7 @@ import {
   isSendgridConfigError,
   sendgridErrorMessage,
   firstSendgridHeader,
+  DELIVERABILITY_TRACKING_SETTINGS,
 } from "@/lib/sendgrid";
 
 const schema = z.union([
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
       to: toEmail,
       subject,
       html,
+      text: body,
+      trackingSettings: DELIVERABILITY_TRACKING_SETTINGS,
       customArgs: contact_id ? { contact_id } : {},
     });
     messageId = firstSendgridHeader(response.headers, "x-message-id");
