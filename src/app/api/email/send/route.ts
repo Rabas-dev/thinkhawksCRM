@@ -11,11 +11,21 @@ import {
   DELIVERABILITY_TRACKING_SETTINGS,
 } from "@/lib/sendgrid";
 
+const attachmentSchema = z.object({
+  filename: z.string().min(1).max(255),
+  type: z.string().max(255),
+  // base64 — SendGrid caps total message size (incl. this ~37% overhead) at
+  // 30MB; capping each attachment's encoded length here is defense in
+  // depth alongside the client-side total-size check in AttachmentField.
+  content: z.string().max(21 * 1024 * 1024),
+});
+
 const schema = z.union([
   z.object({
     contact_id: z.string().uuid(),
     subject: z.string().min(1),
     body: z.string().min(1),
+    attachments: z.array(attachmentSchema).max(10).optional(),
   }),
   // A quick send to someone who isn't (and won't become) a saved contact —
   // the Compose modal offers this as an alternative to "create contact &
@@ -24,6 +34,7 @@ const schema = z.union([
     to: z.string().email(),
     subject: z.string().min(1),
     body: z.string().min(1),
+    attachments: z.array(attachmentSchema).max(10).optional(),
   }),
 ]);
 
@@ -39,6 +50,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const { subject, body } = parsed.data;
+  const attachments = parsed.data.attachments ?? [];
 
   let contact_id: string | null = null;
   let toEmail: string;
@@ -72,6 +84,12 @@ export async function POST(request: NextRequest) {
       text: body,
       trackingSettings: DELIVERABILITY_TRACKING_SETTINGS,
       customArgs: contact_id ? { contact_id } : {},
+      attachments: attachments.map((a) => ({
+        filename: a.filename,
+        type: a.type,
+        content: a.content,
+        disposition: "attachment",
+      })),
     });
     messageId = firstSendgridHeader(response.headers, "x-message-id");
   } catch (err) {
@@ -101,6 +119,7 @@ export async function POST(request: NextRequest) {
     text_body: body,
     html_body: html,
     status: "sent",
+    attachments: attachments.map((a) => ({ filename: a.filename, type: a.type, size: a.content.length })),
   });
 
   // activities is contact-scoped (not null) — a quick send with no saved

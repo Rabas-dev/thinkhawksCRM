@@ -5,6 +5,7 @@ import { Mail } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
+import { AttachmentField, type PendingAttachment } from "@/components/attachment-field";
 import { renderTemplate } from "@/lib/templates";
 import type { Contact, EmailTemplate } from "@/lib/types";
 
@@ -28,6 +29,8 @@ export function EmailDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [signature, setSignature] = useState("");
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +64,7 @@ export function EmailDialog({
     const res = await fetch("/api/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contact_id: contactId, subject, body }),
+      body: JSON.stringify({ contact_id: contactId, subject, body, attachments }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -71,6 +74,7 @@ export function EmailDialog({
     }
     setSubject("");
     setBody("");
+    setAttachments([]);
     onSent();
     onClose();
   }
@@ -107,6 +111,7 @@ export function EmailDialog({
           <Label>Message</Label>
           <Textarea required rows={6} value={body} onChange={(e) => setBody(e.target.value)} />
         </div>
+        <AttachmentField attachments={attachments} onChange={setAttachments} error={attachError} onError={setAttachError} />
         {error && <p className="text-sm text-danger">{error}</p>}
         <Button type="submit" disabled={loading || !contactEmail} className="w-full justify-center">
           <Mail size={15} /> {loading ? "Sending…" : "Send email"}

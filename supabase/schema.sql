@@ -383,3 +383,8 @@ alter table user_settings enable row level security;
 drop policy if exists "own settings only" on user_settings;
 create policy "own settings only" on user_settings
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Attachment filenames sent with an email (informational record only —
+-- the files themselves pass straight through to SendGrid at send time and
+-- aren't stored, so this isn't re-downloadable from the CRM later).
+alter table emails add column if not exists attachments jsonb not null default '[]';

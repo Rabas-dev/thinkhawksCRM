@@ -109,6 +109,7 @@ export type Email = {
   text_body: string | null;
   html_body: string | null;
   status: InboxMessageStatus;
+  attachments: { filename: string; type: string; size: number }[];
   created_at: string;
 };
 

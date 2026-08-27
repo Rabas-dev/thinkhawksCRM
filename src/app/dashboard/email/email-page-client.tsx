@@ -9,6 +9,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Dialog } from "@/components/ui/dialog";
+import { AttachmentField, type PendingAttachment } from "@/components/attachment-field";
 import { format, formatDistanceToNow } from "date-fns";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
@@ -89,6 +90,8 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quickSent, setQuickSent] = useState(false);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [attachError, setAttachError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/email/templates")
@@ -105,6 +108,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     const lastSubject = [...(data.emails ?? [])].reverse()[0]?.subject ?? "";
     setSubject(lastSubject.startsWith("Re: ") ? lastSubject : lastSubject ? `Re: ${lastSubject}` : "");
     setBody("");
+    setAttachments([]);
   }, []);
 
   useEffect(() => {
@@ -123,6 +127,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     setQuickTo(email);
     setSubject("");
     setBody("");
+    setAttachments([]);
     setError(null);
     setQuickSent(false);
     router.replace("/dashboard/email", { scroll: false });
@@ -143,7 +148,9 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     const res = await fetch("/api/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(selectedId ? { contact_id: selectedId, subject, body } : { to: quickTo, subject, body }),
+      body: JSON.stringify(
+        selectedId ? { contact_id: selectedId, subject, body, attachments } : { to: quickTo, subject, body, attachments },
+      ),
     });
     setSending(false);
     if (!res.ok) {
@@ -156,6 +163,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     } else {
       setSubject("");
       setBody("");
+      setAttachments([]);
       setQuickSent(true);
     }
   }
@@ -254,6 +262,18 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                           {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
                         </div>
                         <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
+                        {e.attachments?.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {e.attachments.map((a, i) => (
+                              <span
+                                key={`${a.filename}-${i}`}
+                                className="flex items-center gap-1 rounded-md border border-border bg-section px-2 py-0.5 text-[10px] text-muted"
+                              >
+                                📎 {a.filename}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
                           {e.direction === "outbound" ? "You" : activeContact?.full_name} ·{" "}
                           {format(new Date(e.created_at), "MMM d, h:mm a")}
@@ -292,6 +312,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
                 placeholder="Subject"
                 className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
+              <AttachmentField attachments={attachments} onChange={setAttachments} error={attachError} onError={setAttachError} />
               <div className="flex gap-2">
                 <textarea
                   value={body}
