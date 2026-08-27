@@ -189,6 +189,10 @@ export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarR
       setError(result.error);
       return;
     }
+    // A warning means the send itself succeeded but saving it to history
+    // didn't — surface it rather than silently reloading as if nothing
+    // happened (this thread's history is now genuinely missing that email).
+    if (result.warning) setError(result.warning);
     if (selectedId) {
       loadThread(selectedId);
     } else if (quickTo) {

@@ -7,7 +7,9 @@
  * silently failed here (no try/catch around the fetch meant the promise
  * just rejected into the void — no error shown, Send button stuck).
  */
-export async function sendEmail(payload: unknown): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function sendEmail(
+  payload: unknown,
+): Promise<{ ok: true; warning?: string } | { ok: false; error: string }> {
   const attempt = async () => {
     const res = await fetch("/api/email/send", {
       method: "POST",
@@ -38,9 +40,9 @@ export async function sendEmail(payload: unknown): Promise<{ ok: true } | { ok: 
     }
   }
 
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
     return { ok: false, error: data.error || "Couldn't send that email." };
   }
-  return { ok: true };
+  return { ok: true, warning: data.warning };
 }

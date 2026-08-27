@@ -123,7 +123,12 @@ export async function POST(request: NextRequest) {
     status: "sent",
   });
 
-  await supabase.from("emails").insert({
+  // The email is already sent at this point — SendGrid has it — so a
+  // failure recording it here must never look like the send itself failed.
+  // But it also can't be swallowed silently (a schema drift, like a
+  // migration that was never run, previously failed every insert here with
+  // no trace anywhere): surface it as a warning in the response instead.
+  const { error: recordError } = await supabase.from("emails").insert({
     contact_id,
     direction: "outbound",
     resend_email_id: messageId,
@@ -147,5 +152,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({ ok: true, id: messageId });
+  return NextResponse.json({
+    ok: true,
+    id: messageId,
+    ...(recordError ? { warning: `Sent, but couldn't save it to history: ${recordError.message}` } : {}),
+  });
 }

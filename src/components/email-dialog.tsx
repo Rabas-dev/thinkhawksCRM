@@ -75,6 +75,13 @@ export function EmailDialog({
     setBody("");
     setAttachments([]);
     onSent();
+    // A warning means the send itself succeeded but the history record
+    // didn't — leave the dialog open with that surfaced instead of closing
+    // as if everything was fine.
+    if (result.warning) {
+      setError(result.warning);
+      return;
+    }
     onClose();
   }
 
