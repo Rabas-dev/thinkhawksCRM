@@ -100,11 +100,15 @@ export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [fromName, setFromName] = useState("");
 
   useEffect(() => {
     fetch("/api/email/templates")
       .then((r) => r.json())
       .then((d) => setTemplates(d.templates ?? []));
+    fetch("/api/settings")
+      .then((r) => r.json())
+      .then((d) => setFromName(d.settings?.display_name?.trim() || ""));
   }, []);
 
   const loadThread = useCallback(async (contactId: string) => {
@@ -165,7 +169,9 @@ export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        selectedId ? { contact_id: selectedId, subject, body, attachments } : { to: quickTo, subject, body, attachments },
+        selectedId
+          ? { contact_id: selectedId, subject, body, from_name: fromName, attachments }
+          : { to: quickTo, subject, body, from_name: fromName, attachments },
       ),
     });
     setSending(false);
@@ -328,6 +334,13 @@ export function EmailPageClient({ rows: sidebarRows }: { rows: SidebarRow[] }) {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Subject"
+                className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <input
+                value={fromName}
+                onChange={(e) => setFromName(e.target.value)}
+                placeholder="Show as sender (your name)"
+                maxLength={100}
                 className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               <AttachmentChips attachments={attachments} onChange={setAttachments} error={attachError} />

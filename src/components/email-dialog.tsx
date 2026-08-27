@@ -29,6 +29,7 @@ export function EmailDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [signature, setSignature] = useState("");
+  const [fromName, setFromName] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,6 +47,8 @@ export function EmailDialog({
         setSignature(sig);
         // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill a fresh compose with the agent's signature
         if (sig) setBody((current) => current || `\n\n${sig}`);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill the visible sender name from the agent's Settings default
+        setFromName((current) => current || d.settings?.display_name?.trim() || "");
       });
   }, [open]);
 
@@ -64,7 +67,7 @@ export function EmailDialog({
     const res = await fetch("/api/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contact_id: contactId, subject, body, attachments }),
+      body: JSON.stringify({ contact_id: contactId, subject, body, from_name: fromName, attachments }),
     });
     setLoading(false);
     if (!res.ok) {
@@ -85,6 +88,15 @@ export function EmailDialog({
         <div>
           <Label>To</Label>
           <Input value={contactEmail ?? "No email on file"} disabled />
+        </div>
+        <div>
+          <Label>Show as sender</Label>
+          <Input
+            value={fromName}
+            onChange={(e) => setFromName(e.target.value)}
+            placeholder="Your name"
+            maxLength={100}
+          />
         </div>
         {templates.length > 0 && (
           <div>

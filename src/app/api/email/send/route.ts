@@ -20,12 +20,21 @@ const attachmentSchema = z.object({
   content: z.string().max(21 * 1024 * 1024),
 });
 
+// The visible "From" name in the recipient's mailbox — the underlying
+// address always stays EMAIL_FROM (the domain-authenticated sender SPF/DKIM
+// pass for), this just changes what's displayed alongside it. No CR/LF, so
+// it can't be used to inject extra headers into the outgoing message.
+const fromNameSchema = z.string().trim().min(1).max(100).regex(/^[^\r\n]*$/);
+
+const attachmentsField = z.array(attachmentSchema).max(10).optional();
+
 const schema = z.union([
   z.object({
     contact_id: z.string().uuid(),
     subject: z.string().min(1),
     body: z.string().min(1),
-    attachments: z.array(attachmentSchema).max(10).optional(),
+    from_name: fromNameSchema.optional(),
+    attachments: attachmentsField,
   }),
   // A quick send to someone who isn't (and won't become) a saved contact —
   // the Compose modal offers this as an alternative to "create contact &
@@ -34,7 +43,8 @@ const schema = z.union([
     to: z.string().email(),
     subject: z.string().min(1),
     body: z.string().min(1),
-    attachments: z.array(attachmentSchema).max(10).optional(),
+    from_name: fromNameSchema.optional(),
+    attachments: attachmentsField,
   }),
 ]);
 
@@ -51,6 +61,7 @@ export async function POST(request: NextRequest) {
   }
   const { subject, body } = parsed.data;
   const attachments = parsed.data.attachments ?? [];
+  const fromName = parsed.data.from_name || "Think Hawks";
 
   let contact_id: string | null = null;
   let toEmail: string;
@@ -77,7 +88,7 @@ export async function POST(request: NextRequest) {
   try {
     const sgMail = getSendgrid();
     const [response] = await sgMail.send({
-      from: EMAIL_FROM,
+      from: { email: EMAIL_FROM, name: fromName },
       to: toEmail,
       subject,
       html,
