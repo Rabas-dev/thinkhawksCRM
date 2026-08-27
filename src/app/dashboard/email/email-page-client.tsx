@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Send, Mail as MailIcon, MailOpen, Search } from "lucide-react";
+import { Send, Mail as MailIcon, MailOpen, Search, PenSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
+import { Dialog } from "@/components/ui/dialog";
 import { format, formatDistanceToNow } from "date-fns";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
@@ -76,6 +77,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
   const searchParams = useSearchParams();
 
   const [q, setQ] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("contact"));
   const [emails, setEmails] = useState<Email[]>([]);
   const [events, setEvents] = useState<EmailEvent[]>([]);
@@ -149,7 +151,12 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
     <div className="flex h-screen">
       <div className="flex w-80 shrink-0 flex-col border-r border-border bg-surface">
         <div className="border-b border-border px-5 py-4">
-          <h1 className="text-lg font-semibold text-secondary">Email</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-secondary">Email</h1>
+            <Button type="button" size="sm" onClick={() => setComposeOpen(true)}>
+              <PenSquare size={14} /> Compose
+            </Button>
+          </div>
           <div className="relative mt-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search contacts…" className="pl-8" />
@@ -275,6 +282,173 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
           </>
         )}
       </div>
+
+      <ComposeDialog
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        onPicked={(id) => {
+          setComposeOpen(false);
+          selectContact(id);
+        }}
+      />
     </div>
+  );
+}
+
+type ContactSearchResult = { id: string; full_name: string; email: string | null; company: string | null };
+
+/**
+ * Gmail-style "Compose" entry point — the sidebar list only shows contacts
+ * who already have an email on file, and doesn't make starting a thread
+ * with someone new (or without an address yet) obvious. This searches all
+ * contacts, lets you add an email inline if one's missing, or create a
+ * brand-new contact — then hands off to the existing thread view to
+ * actually send, rather than duplicating that logic here.
+ */
+function ComposeDialog({
+  open,
+  onClose,
+  onPicked,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPicked: (contactId: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<ContactSearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [addingEmailFor, setAddingEmailFor] = useState<ContactSearchResult | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setQ("");
+      setResults([]);
+      setAddingEmailFor(null);
+      setNewName("");
+      setNewEmail("");
+      setError(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    const t = setTimeout(() => {
+      fetch(`/api/contacts${q ? `?q=${encodeURIComponent(q)}` : ""}`)
+        .then((r) => r.json())
+        .then((d) => setResults(d.contacts ?? []))
+        .finally(() => setLoading(false));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [q, open]);
+
+  async function saveEmailAndPick(contact: ContactSearchResult) {
+    if (!emailInput.trim()) return;
+    setSaving(true);
+    setError(null);
+    const res = await fetch(`/api/contacts/${contact.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailInput.trim() }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setError("Couldn't save that email address.");
+      return;
+    }
+    onPicked(contact.id);
+  }
+
+  async function createAndPick(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ full_name: newName, email: newEmail }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      setError("Couldn't create that contact.");
+      return;
+    }
+    const data = await res.json();
+    onPicked(data.contact.id);
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} title="Compose email">
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <Input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search contacts by name, email, company…"
+          className="pl-8"
+        />
+      </div>
+
+      <div className="mt-2 max-h-64 overflow-y-auto rounded-lg border border-border">
+        {loading ? (
+          <p className="p-4 text-center text-sm text-muted">Searching…</p>
+        ) : results.length === 0 ? (
+          <p className="p-4 text-center text-sm text-muted">No contacts found.</p>
+        ) : (
+          results.map((c) => (
+            <div key={c.id} className="border-b border-border px-3 py-2 last:border-b-0">
+              <button
+                type="button"
+                onClick={() => (c.email ? onPicked(c.id) : setAddingEmailFor(c))}
+                className="flex w-full items-center gap-2.5 text-left cursor-pointer"
+              >
+                <Avatar name={c.full_name} size={28} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-ink">{c.full_name}</p>
+                  <p className="truncate text-xs text-muted">{c.email || "No email on file — click to add one"}</p>
+                </div>
+              </button>
+              {addingEmailFor?.id === c.id && (
+                <div className="mt-2 flex gap-2 pl-[38px]">
+                  <Input
+                    autoFocus
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="email@example.com"
+                    className="h-8 text-sm"
+                  />
+                  <Button type="button" size="sm" disabled={saving} onClick={() => saveEmailAndPick(c)}>
+                    Use
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <form onSubmit={createAndPick} className="mt-4 space-y-2 border-t border-border pt-4">
+        <Label>Or email someone new</Label>
+        <Input required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" />
+        <Input
+          required
+          type="email"
+          value={newEmail}
+          onChange={(e) => setNewEmail(e.target.value)}
+          placeholder="email@example.com"
+        />
+        <Button type="submit" disabled={saving} className="w-full justify-center">
+          Create contact & compose
+        </Button>
+        {error && <p className="text-sm text-danger">{error}</p>}
+      </form>
+    </Dialog>
   );
 }
