@@ -79,6 +79,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
   const [q, setQ] = useState("");
   const [composeOpen, setComposeOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get("contact"));
+  const [quickTo, setQuickTo] = useState<string | null>(null);
   const [emails, setEmails] = useState<Email[]>([]);
   const [events, setEvents] = useState<EmailEvent[]>([]);
   const [activeContact, setActiveContact] = useState<Contact | null>(null);
@@ -87,6 +88,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickSent, setQuickSent] = useState(false);
 
   useEffect(() => {
     fetch("/api/email/templates")
@@ -111,26 +113,37 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
   }, [selectedId, loadThread]);
 
   function selectContact(id: string) {
+    setQuickTo(null);
     setSelectedId(id);
     router.replace(`/dashboard/email?contact=${id}`, { scroll: false });
   }
 
+  function startQuickCompose(email: string) {
+    setSelectedId(null);
+    setQuickTo(email);
+    setSubject("");
+    setBody("");
+    setError(null);
+    setQuickSent(false);
+    router.replace("/dashboard/email", { scroll: false });
+  }
+
   function applyTemplate(templateId: string) {
     const t = templates.find((tpl) => tpl.id === templateId);
-    if (!t || !activeContact) return;
-    setSubject(renderTemplate(t.subject, activeContact));
-    setBody(renderTemplate(t.body, activeContact));
+    if (!t) return;
+    setSubject(activeContact ? renderTemplate(t.subject, activeContact) : t.subject);
+    setBody(activeContact ? renderTemplate(t.body, activeContact) : t.body);
   }
 
   async function sendReply(e: React.FormEvent) {
     e.preventDefault();
-    if (!body.trim() || !subject.trim() || !selectedId) return;
+    if (!body.trim() || !subject.trim()) return;
     setSending(true);
     setError(null);
     const res = await fetch("/api/email/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contact_id: selectedId, subject, body }),
+      body: JSON.stringify(selectedId ? { contact_id: selectedId, subject, body } : { to: quickTo, subject, body }),
     });
     setSending(false);
     if (!res.ok) {
@@ -138,7 +151,13 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
       setError(data.error || "Couldn't send that email.");
       return;
     }
-    loadThread(selectedId);
+    if (selectedId) {
+      loadThread(selectedId);
+    } else {
+      setSubject("");
+      setBody("");
+      setQuickSent(true);
+    }
   }
 
   const filtered = contacts.filter((c) => {
@@ -197,50 +216,58 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
       </div>
 
       <div className="flex flex-1 flex-col bg-section">
-        {!selectedId ? (
+        {!selectedId && !quickTo ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted">
             <MailIcon size={22} className="text-muted" />
-            Select a contact to start or continue an email conversation
+            Select a contact, or Compose, to start an email
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between border-b border-border bg-surface px-5 py-4">
               <div>
-                <p className="text-sm font-medium text-secondary">{activeContact?.full_name}</p>
-                <p className="text-xs text-muted">{activeContact?.email}</p>
+                <p className="text-sm font-medium text-secondary">{selectedId ? activeContact?.full_name : quickTo}</p>
+                <p className="text-xs text-muted">
+                  {selectedId ? activeContact?.email : "Not saved to Contacts"}
+                </p>
               </div>
             </div>
 
             <div className="flex-1 space-y-3 overflow-y-auto p-5">
-              {emails.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted">No emails in this thread yet — send the first one below.</p>
-              ) : (
-                emails.map((e) => {
-                  const relatedEvents = e.resend_email_id
-                    ? events.filter((ev) => ev.resend_email_id === e.resend_email_id)
-                    : [];
-                  return (
-                    <div
-                      key={e.id}
-                      className={cn(
-                        "max-w-[80%] rounded-xl border border-border bg-surface p-3",
-                        e.direction === "outbound" ? "ml-auto" : "mr-auto",
-                      )}
-                    >
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-ink">{e.subject || "(no subject)"}</p>
-                        {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
+              {selectedId ? (
+                emails.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted">No emails in this thread yet — send the first one below.</p>
+                ) : (
+                  emails.map((e) => {
+                    const relatedEvents = e.resend_email_id
+                      ? events.filter((ev) => ev.resend_email_id === e.resend_email_id)
+                      : [];
+                    return (
+                      <div
+                        key={e.id}
+                        className={cn(
+                          "max-w-[80%] rounded-xl border border-border bg-surface p-3",
+                          e.direction === "outbound" ? "ml-auto" : "mr-auto",
+                        )}
+                      >
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold text-ink">{e.subject || "(no subject)"}</p>
+                          {e.direction === "inbound" && <Badge tone="muted">received</Badge>}
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
+                        <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
+                          {e.direction === "outbound" ? "You" : activeContact?.full_name} ·{" "}
+                          {format(new Date(e.created_at), "MMM d, h:mm a")}
+                          {e.direction === "outbound" && <OpenedIndicator status={e.status} />}
+                        </p>
+                        {e.direction === "outbound" && <TrackingTimeline events={relatedEvents} />}
                       </div>
-                      <p className="whitespace-pre-wrap text-sm text-ink">{e.text_body}</p>
-                      <p className="mt-1.5 flex items-center gap-1 text-[10px] text-muted">
-                        {e.direction === "outbound" ? "You" : activeContact?.full_name} ·{" "}
-                        {format(new Date(e.created_at), "MMM d, h:mm a")}
-                        {e.direction === "outbound" && <OpenedIndicator status={e.status} />}
-                      </p>
-                      {e.direction === "outbound" && <TrackingTimeline events={relatedEvents} />}
-                    </div>
-                  );
-                })
+                    );
+                  })
+                )
+              ) : (
+                <p className="py-6 text-center text-sm text-muted">
+                  {quickSent ? "Sent — not saved to Contacts, so there's no thread to show here." : "Not saved to Contacts — compose below and send."}
+                </p>
               )}
             </div>
 
@@ -290,7 +317,10 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
           setComposeOpen(false);
           selectContact(id);
         }}
-        onSent={() => setComposeOpen(false)}
+        onQuickPicked={(email) => {
+          setComposeOpen(false);
+          startQuickCompose(email);
+        }}
       />
     </div>
   );
@@ -310,12 +340,12 @@ function ComposeDialog({
   open,
   onClose,
   onPicked,
-  onSent,
+  onQuickPicked,
 }: {
   open: boolean;
   onClose: () => void;
   onPicked: (contactId: string) => void;
-  onSent: () => void;
+  onQuickPicked: (email: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ContactSearchResult[]>([]);
@@ -326,8 +356,6 @@ function ComposeDialog({
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [quickTo, setQuickTo] = useState("");
-  const [quickSubject, setQuickSubject] = useState("");
-  const [quickBody, setQuickBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -340,8 +368,6 @@ function ComposeDialog({
       setNewName("");
       setNewEmail("");
       setQuickTo("");
-      setQuickSubject("");
-      setQuickBody("");
       setError(null);
     }
   }, [open]);
@@ -393,22 +419,9 @@ function ComposeDialog({
     onPicked(data.contact.id);
   }
 
-  async function sendQuick(e: React.FormEvent) {
+  function startQuick(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
-    setError(null);
-    const res = await fetch("/api/email/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ to: quickTo, subject: quickSubject, body: quickBody }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Couldn't send that email.");
-      return;
-    }
-    onSent();
+    onQuickPicked(quickTo.trim());
   }
 
   return (
@@ -498,7 +511,7 @@ function ComposeDialog({
             </Button>
           </form>
         ) : (
-          <form onSubmit={sendQuick} className="space-y-2">
+          <form onSubmit={startQuick} className="space-y-2">
             <Input
               required
               type="email"
@@ -506,17 +519,8 @@ function ComposeDialog({
               onChange={(e) => setQuickTo(e.target.value)}
               placeholder="email@example.com"
             />
-            <Input required value={quickSubject} onChange={(e) => setQuickSubject(e.target.value)} placeholder="Subject" />
-            <textarea
-              required
-              value={quickBody}
-              onChange={(e) => setQuickBody(e.target.value)}
-              placeholder="Write a message…"
-              rows={3}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <Button type="submit" disabled={saving} className="w-full justify-center">
-              <Send size={14} /> Send — not saved to Contacts
+            <Button type="submit" className="w-full justify-center">
+              <PenSquare size={14} /> Compose — not saved to Contacts
             </Button>
           </form>
         )}
