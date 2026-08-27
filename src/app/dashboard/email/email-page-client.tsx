@@ -290,6 +290,7 @@ export function EmailPageClient({ contacts }: { contacts: ContactRow[] }) {
           setComposeOpen(false);
           selectContact(id);
         }}
+        onSent={() => setComposeOpen(false)}
       />
     </div>
   );
@@ -309,18 +310,24 @@ function ComposeDialog({
   open,
   onClose,
   onPicked,
+  onSent,
 }: {
   open: boolean;
   onClose: () => void;
   onPicked: (contactId: string) => void;
+  onSent: () => void;
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ContactSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [addingEmailFor, setAddingEmailFor] = useState<ContactSearchResult | null>(null);
   const [emailInput, setEmailInput] = useState("");
+  const [newRecipientMode, setNewRecipientMode] = useState<"contact" | "quick">("contact");
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [quickTo, setQuickTo] = useState("");
+  const [quickSubject, setQuickSubject] = useState("");
+  const [quickBody, setQuickBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -329,8 +336,12 @@ function ComposeDialog({
       setQ("");
       setResults([]);
       setAddingEmailFor(null);
+      setNewRecipientMode("contact");
       setNewName("");
       setNewEmail("");
+      setQuickTo("");
+      setQuickSubject("");
+      setQuickBody("");
       setError(null);
     }
   }, [open]);
@@ -380,6 +391,24 @@ function ComposeDialog({
     }
     const data = await res.json();
     onPicked(data.contact.id);
+  }
+
+  async function sendQuick(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: quickTo, subject: quickSubject, body: quickBody }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Couldn't send that email.");
+      return;
+    }
+    onSent();
   }
 
   return (
@@ -434,21 +463,65 @@ function ComposeDialog({
         )}
       </div>
 
-      <form onSubmit={createAndPick} className="mt-4 space-y-2 border-t border-border pt-4">
-        <Label>Or email someone new</Label>
-        <Input required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" />
-        <Input
-          required
-          type="email"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          placeholder="email@example.com"
-        />
-        <Button type="submit" disabled={saving} className="w-full justify-center">
-          Create contact & compose
-        </Button>
-        {error && <p className="text-sm text-danger">{error}</p>}
-      </form>
+      <div className="mt-4 border-t border-border pt-4">
+        <Label>Someone new</Label>
+        <div className="mb-2 flex gap-2">
+          {(["contact", "quick"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setNewRecipientMode(m)}
+              className={cn(
+                "flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition",
+                newRecipientMode === m
+                  ? "border-primary bg-primary/10 text-primary-dark"
+                  : "border-border bg-surface text-ink hover:bg-section",
+              )}
+            >
+              {m === "contact" ? "Save as contact" : "Just send, don't save"}
+            </button>
+          ))}
+        </div>
+
+        {newRecipientMode === "contact" ? (
+          <form onSubmit={createAndPick} className="space-y-2">
+            <Input required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" />
+            <Input
+              required
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="email@example.com"
+            />
+            <Button type="submit" disabled={saving} className="w-full justify-center">
+              Create contact & compose
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={sendQuick} className="space-y-2">
+            <Input
+              required
+              type="email"
+              value={quickTo}
+              onChange={(e) => setQuickTo(e.target.value)}
+              placeholder="email@example.com"
+            />
+            <Input required value={quickSubject} onChange={(e) => setQuickSubject(e.target.value)} placeholder="Subject" />
+            <textarea
+              required
+              value={quickBody}
+              onChange={(e) => setQuickBody(e.target.value)}
+              placeholder="Write a message…"
+              rows={3}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <Button type="submit" disabled={saving} className="w-full justify-center">
+              <Send size={14} /> Send — not saved to Contacts
+            </Button>
+          </form>
+        )}
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      </div>
     </Dialog>
   );
 }
