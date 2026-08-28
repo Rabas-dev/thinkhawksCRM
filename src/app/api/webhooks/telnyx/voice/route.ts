@@ -230,16 +230,28 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // Telnyx can deliver more than one call.answered for the same call
+      // (e.g. a second one for the inbound leg itself once it's bridged, in
+      // addition to the bridge leg's own) — without this idempotency check
+      // each redundant delivery re-issued a record_start to Telnyx for a
+      // call that's already recording, wasting an API call for no effect.
       const sessionId = payload.call_session_id as string;
-      await supabase
+      const { data: existing } = await supabase
         .from("calls")
-        .update({ status: "in-progress", started_at: new Date().toISOString() })
-        .eq("telnyx_call_session_id", sessionId);
+        .select("id, status")
+        .eq("telnyx_call_session_id", sessionId)
+        .maybeSingle();
+      if (existing && existing.status !== "in-progress") {
+        await supabase
+          .from("calls")
+          .update({ status: "in-progress", started_at: new Date().toISOString() })
+          .eq("id", existing.id);
 
-      try {
-        await startRecording(answeredCallControlId);
-      } catch {
-        // Recording is best-effort — a failure here shouldn't drop the call.
+        try {
+          await startRecording(answeredCallControlId);
+        } catch {
+          // Recording is best-effort — a failure here shouldn't drop the call.
+        }
       }
       break;
     }
