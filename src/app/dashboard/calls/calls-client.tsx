@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PhoneIncoming, PhoneOutgoing, Search } from "lucide-react";
 import { Card, Badge } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { RecordingPlayer } from "@/components/recording-player";
 import { cn, formatDuration } from "@/lib/utils";
 import { format } from "date-fns";
 import type { Call } from "@/lib/types";
@@ -97,7 +98,7 @@ export function CallsClient({ calls }: { calls: CallRow[] }) {
                 {c.status}
               </Badge>
               {c.recording_url ? (
-                <audio controls src={`/api/calls/${c.id}/recording`} className="h-8 w-48 shrink-0" />
+                <RecordingPlayer src={`/api/calls/${c.id}/recording`} className="w-56 shrink-0" />
               ) : (
                 <span className="w-48 shrink-0 text-right text-xs text-muted">no recording</span>
               )}

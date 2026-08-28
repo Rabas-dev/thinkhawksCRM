@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { DialerPanel } from "@/components/dialer-panel";
+import { RecordingPlayer } from "@/components/recording-player";
 import { useDialer } from "@/lib/dialer-context";
 import type { Call } from "@/lib/types";
 import { format, formatDistanceToNow } from "date-fns";
@@ -161,7 +162,7 @@ export function DialerPageClient({ contacts }: { contacts: ContactRow[] }) {
                         {c.status}
                       </Badge>
                       {c.recording_url && (
-                        <audio controls src={`/api/calls/${c.id}/recording`} className="h-8 w-full shrink-0 sm:w-48" />
+                        <RecordingPlayer src={`/api/calls/${c.id}/recording`} className="w-full shrink-0 sm:w-56" />
                       )}
                       {c.notes && <p className="w-full pl-11 text-xs text-muted">{c.notes}</p>}
                     </div>

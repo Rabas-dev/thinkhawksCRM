@@ -26,6 +26,7 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Card, Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { EditContactDrawer } from "@/components/edit-contact-drawer";
+import { RecordingPlayer } from "@/components/recording-player";
 import { cn, formatDuration } from "@/lib/utils";
 import { useDialer } from "@/lib/dialer-context";
 import { MeetingDialog } from "@/components/meeting-dialog";
@@ -572,7 +573,7 @@ function TimelineRow({ item, contact }: { item: TimelineItem; contact: Contact }
           </span>
           <Badge tone={c.status === "completed" ? "success" : "muted"}>{c.status}</Badge>
         </div>
-        {c.recording_url && <audio controls src={`/api/calls/${c.id}/recording`} className="mt-2 h-8 w-full" />}
+        {c.recording_url && <RecordingPlayer src={`/api/calls/${c.id}/recording`} className="mt-2 w-full" />}
         <p className="mt-1.5 text-[10px] text-muted" suppressHydrationWarning>{format(new Date(c.created_at), "MMM d, h:mm a")}</p>
       </div>
     );

@@ -109,3 +109,52 @@ a, button {
 .gradient-bg {
   background: linear-gradient(135deg, #8ea97a 0%, #a9c193 100%);
 }
+
+/* Recording playback seek bar — deliberately larger than the browser
+   default so it's actually draggable (see RecordingPlayer). The invisible
+   full-height hit area is what makes it forgiving to grab, not just the
+   visible track/thumb. */
+.recording-seek {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+.recording-seek::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+.recording-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.recording-seek::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+.recording-seek::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.recording-seek:hover::-webkit-slider-thumb,
+.recording-seek:focus-visible::-webkit-slider-thumb {
+  background: var(--color-primary-dark);
+}
+.recording-seek:hover::-moz-range-thumb,
+.recording-seek:focus-visible::-moz-range-thumb {
+  background: var(--color-primary-dark);
+}
