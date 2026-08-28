@@ -179,6 +179,19 @@ export async function dialSipLeg(sipUsername: string, callerId?: string): Promis
   return newLegId;
 }
 
+/**
+ * Answers an inbound leg still in the "ringing" state. Required before that
+ * leg can be bridged — confirmed against the live API: bridging a caller's
+ * leg that's only had ringback_start (not answer) called on it fails with
+ * "This call can't receive bridge command because it has not been answered
+ * yet". Ringback keeps the caller hearing a ring tone in the meantime;
+ * answering doesn't interrupt that on its own, bridging is what replaces it
+ * with the connected agent's audio.
+ */
+export async function answerCall(callControlId: string) {
+  await telnyxRequest(`/calls/${callControlId}/actions/answer`, { method: "POST" });
+}
+
 /** Bridges two already-answered call legs together. */
 export async function bridgeCalls(callControlIdA: string, callControlIdB: string) {
   await telnyxRequest(`/calls/${callControlIdA}/actions/bridge`, {

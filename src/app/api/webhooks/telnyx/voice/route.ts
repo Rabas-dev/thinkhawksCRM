@@ -8,6 +8,7 @@ import {
   hangup,
   startRingback,
   stopRingback,
+  answerCall,
   TELNYX_NUMBER,
 } from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -221,6 +222,12 @@ export async function POST(request: NextRequest) {
       if (pendingBridge?.telnyx_call_control_id) {
         await supabase.from("calls").update({ bridge_leg_call_control_id: null }).eq("id", pendingBridge.id);
         try {
+          // The inbound leg has only ever had ringback_start called on it —
+          // still "ringing" as far as Call Control is concerned. bridge
+          // requires both legs already answered; without this the bridge
+          // call below fails every time with "This call can't receive
+          // bridge command because it has not been answered yet."
+          await answerCall(pendingBridge.telnyx_call_control_id);
           await bridgeCalls(pendingBridge.telnyx_call_control_id, answeredCallControlId);
           try {
             await stopRingback(pendingBridge.telnyx_call_control_id);
