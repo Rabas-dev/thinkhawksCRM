@@ -105,6 +105,26 @@ export async function POST(request: NextRequest) {
           contact = created;
         }
 
+        // Some carriers/handsets fire several near-simultaneous INVITEs for
+        // what's really one call attempt (seen in practice: 20-30 separate
+        // call.initiated events from the same number within a few seconds).
+        // Each used to get its own dial-to-browser bridge leg, which is what
+        // actually exhausted Telnyx's concurrent-call limit and cascaded
+        // into busy/487 failures for the rest — not the caller redialing.
+        // If a call from this number already started dialing a bridge leg
+        // in the last 10s, skip dialing another one; the duplicate leg just
+        // rings out on its own without costing us an outbound channel.
+        const recentWindow = new Date(Date.now() - 10_000).toISOString();
+        const { data: recentDuplicate } = await supabase
+          .from("calls")
+          .select("id")
+          .eq("contact_phone", from)
+          .eq("direction", "inbound")
+          .in("status", ["ringing", "in-progress"])
+          .gte("created_at", recentWindow)
+          .limit(1)
+          .maybeSingle();
+
         const { data: insertedCall } = await supabase
           .from("calls")
           .insert({
@@ -114,9 +134,12 @@ export async function POST(request: NextRequest) {
             direction: "inbound",
             status: "ringing",
             contact_phone: from,
+            ...(recentDuplicate ? { notes: "skipped bridge dial: duplicate of a call from this number already ringing" } : {}),
           })
           .select("id")
           .single();
+
+        if (recentDuplicate) break;
 
         try {
           await startRingback(payload.call_control_id as string);
