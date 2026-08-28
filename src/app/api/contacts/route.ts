@@ -22,9 +22,18 @@ export async function GET(request: NextRequest) {
   let query = supabase.from("contacts").select("*").order("created_at", { ascending: false });
 
   if (q) {
-    query = query.or(
-      `full_name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,company.ilike.%${q}%`,
-    );
+    // `,`/`.`/`(`/`)` all carry syntax meaning in a PostgREST .or() filter
+    // string — interpolating raw search text let a comma inject an
+    // additional filter clause (e.g. beyond the 4 columns intended here) or
+    // just 400 on a malformed filter for an ordinary search containing one.
+    // Stripped rather than escaped since none of them are meaningful in a
+    // plain-text contact search anyway.
+    const safeQ = q.replace(/[,.()]/g, "");
+    if (safeQ) {
+      query = query.or(
+        `full_name.ilike.%${safeQ}%,email.ilike.%${safeQ}%,phone.ilike.%${safeQ}%,company.ilike.%${safeQ}%`,
+      );
+    }
   }
 
   const { data, error } = await query;
