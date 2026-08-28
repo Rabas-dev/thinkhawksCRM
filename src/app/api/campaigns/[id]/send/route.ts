@@ -10,6 +10,11 @@ import {
 } from "@/lib/sendgrid";
 import { renderTemplate } from "@/lib/templates";
 
+// A large audience sends in sequential batches of CHUNK_SIZE — give this
+// route enough headroom on Vercel to actually finish a multi-batch send
+// rather than getting killed partway through.
+export const maxDuration = 60;
+
 const CHUNK_SIZE = 100;
 
 function chunk<T>(items: T[], size: number): T[][] {

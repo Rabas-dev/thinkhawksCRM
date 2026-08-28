@@ -1,10 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  // Produces a self-contained .next/standalone/server.js that only needs its
-  // own bundled node_modules — this is what Hostinger's Passenger-based
-  // Node.js App hosting expects to point at, instead of a full `next start`.
-  output: "standalone",
-};
+// No `output: "standalone"` here — that was specifically for Hostinger's
+// Passenger-based Node.js hosting, which needed a self-contained
+// server.js. Vercel builds and runs this natively; setting standalone
+// output on Vercel is actively discouraged (it bypasses Vercel's own
+// build optimizations) rather than merely unnecessary.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

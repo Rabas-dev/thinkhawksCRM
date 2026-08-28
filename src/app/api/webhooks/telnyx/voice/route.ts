@@ -14,6 +14,12 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 import type { CallStatus } from "@/lib/types";
 
+// call.initiated chains up to ~9 sequential network calls (Supabase reads/
+// writes plus 2 Telnyx REST calls) — comfortably under Vercel's default
+// limit in practice, but this headroom absorbs a Telnyx latency spike
+// without the function getting killed mid-dial.
+export const maxDuration = 30;
+
 function mapHangupStatus(cause: string | undefined): CallStatus {
   switch (cause) {
     case "no_answer":
