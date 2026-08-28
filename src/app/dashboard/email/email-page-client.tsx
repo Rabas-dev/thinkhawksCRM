@@ -446,10 +446,6 @@ export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarR
           setComposeOpen(false);
           selectContact(id);
         }}
-        onQuickPicked={(email) => {
-          setComposeOpen(false);
-          openQuickThread(email);
-        }}
       />
     </div>
   );
@@ -469,22 +465,18 @@ function ComposeDialog({
   open,
   onClose,
   onPicked,
-  onQuickPicked,
 }: {
   open: boolean;
   onClose: () => void;
   onPicked: (contactId: string) => void;
-  onQuickPicked: (email: string) => void;
 }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<ContactSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [addingEmailFor, setAddingEmailFor] = useState<ContactSearchResult | null>(null);
   const [emailInput, setEmailInput] = useState("");
-  const [newRecipientMode, setNewRecipientMode] = useState<"contact" | "quick">("contact");
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [quickTo, setQuickTo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -493,10 +485,8 @@ function ComposeDialog({
       setQ("");
       setResults([]);
       setAddingEmailFor(null);
-      setNewRecipientMode("contact");
       setNewName("");
       setNewEmail("");
-      setQuickTo("");
       setError(null);
     }
   }, [open]);
@@ -546,11 +536,6 @@ function ComposeDialog({
     }
     const data = await res.json();
     onPicked(data.contact.id);
-  }
-
-  function startQuick(e: React.FormEvent) {
-    e.preventDefault();
-    onQuickPicked(quickTo.trim());
   }
 
   return (
@@ -607,52 +592,19 @@ function ComposeDialog({
 
       <div className="mt-4 border-t border-border pt-4">
         <Label>Someone new</Label>
-        <div className="mb-2 flex gap-2">
-          {(["contact", "quick"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setNewRecipientMode(m)}
-              className={cn(
-                "flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition",
-                newRecipientMode === m
-                  ? "border-primary bg-primary/10 text-primary-dark"
-                  : "border-border bg-surface text-ink hover:bg-section",
-              )}
-            >
-              {m === "contact" ? "Save as contact" : "Just send, don't save"}
-            </button>
-          ))}
-        </div>
-
-        {newRecipientMode === "contact" ? (
-          <form onSubmit={createAndPick} className="space-y-2">
-            <Input required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" />
-            <Input
-              required
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="email@example.com"
-            />
-            <Button type="submit" disabled={saving} className="w-full justify-center">
-              Create contact & compose
-            </Button>
-          </form>
-        ) : (
-          <form onSubmit={startQuick} className="space-y-2">
-            <Input
-              required
-              type="email"
-              value={quickTo}
-              onChange={(e) => setQuickTo(e.target.value)}
-              placeholder="email@example.com"
-            />
-            <Button type="submit" className="w-full justify-center">
-              <PenSquare size={14} /> Compose — not saved to Contacts
-            </Button>
-          </form>
-        )}
+        <form onSubmit={createAndPick} className="space-y-2">
+          <Input required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" />
+          <Input
+            required
+            type="email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            placeholder="email@example.com"
+          />
+          <Button type="submit" disabled={saving} className="w-full justify-center">
+            Create contact & compose
+          </Button>
+        </form>
         {error && <p className="mt-2 text-sm text-danger">{error}</p>}
       </div>
     </Dialog>
