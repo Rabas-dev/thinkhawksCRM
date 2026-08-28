@@ -5,8 +5,15 @@ import { pauseRecording, resumeRecording, stopRecording, getRecordingUrl } from 
 /**
  * Streams a call recording through our own auth gate, so we never hand out
  * the raw Telnyx-hosted URL to the browser directly.
+ *
+ * Forwards the browser's Range header to S3 (which supports it natively)
+ * and mirrors back Content-Range/Accept-Ranges/206 — without this, dragging
+ * the player's seek bar does nothing: setting <audio>.currentTime makes the
+ * browser issue a ranged request for that byte offset, and a proxy that
+ * always answers with the full file from byte 0 makes playback snap back
+ * to 0:00 instead of actually seeking.
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
   const {
@@ -37,17 +44,26 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  const upstream = await fetch(playbackUrl);
+  const range = request.headers.get("range") ?? undefined;
+  const upstream = await fetch(playbackUrl, range ? { headers: { range } } : undefined);
 
   if (!upstream.ok || !upstream.body) {
     return NextResponse.json({ error: "Recording not available yet" }, { status: 502 });
   }
 
+  const headers = new Headers({
+    "Content-Type": "audio/mpeg",
+    "Cache-Control": "private, max-age=3600",
+    "Accept-Ranges": "bytes",
+  });
+  const contentRange = upstream.headers.get("content-range");
+  const contentLength = upstream.headers.get("content-length");
+  if (contentRange) headers.set("Content-Range", contentRange);
+  if (contentLength) headers.set("Content-Length", contentLength);
+
   return new NextResponse(upstream.body, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "private, max-age=3600",
-    },
+    status: upstream.status === 206 ? 206 : 200,
+    headers,
   });
 }
 
