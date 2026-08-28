@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { Plus, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2 } from "lucide-react";
+import { Plus, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Drawer } from "@/components/ui/drawer";
+import { EditContactDrawer } from "@/components/edit-contact-drawer";
 import { cn } from "@/lib/utils";
 import type { Contact } from "@/lib/types";
 import { format } from "date-fns";
@@ -33,6 +34,7 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
   const load = useCallback(async (search: string) => {
     setLoading(true);
@@ -158,18 +160,19 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
               <th className="border-b border-border px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted">
                 Tags
               </th>
+              <th className="w-10 border-b border-border px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={COLUMNS.length + 2} className="p-6 text-center text-sm text-muted">
+                <td colSpan={COLUMNS.length + 3} className="p-6 text-center text-sm text-muted">
                   Loading…
                 </td>
               </tr>
             ) : sorted.length === 0 ? (
               <tr>
-                <td colSpan={COLUMNS.length + 2} className="p-6 text-center text-sm text-muted">
+                <td colSpan={COLUMNS.length + 3} className="p-6 text-center text-sm text-muted">
                   No contacts yet.
                 </td>
               </tr>
@@ -211,6 +214,14 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
                       ))}
                     </div>
                   </td>
+                  <td className="border-b border-border px-3 py-2.5">
+                    <button
+                      onClick={() => setEditingContact(c)}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-muted opacity-0 group-hover:opacity-100 hover:bg-ink/5 hover:text-ink cursor-pointer"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -232,6 +243,15 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
           load(q);
         }}
       />
+
+      {editingContact && (
+        <EditContactDrawer
+          open={!!editingContact}
+          onClose={() => setEditingContact(null)}
+          contact={editingContact}
+          onSaved={() => load(q)}
+        />
+      )}
     </div>
   );
 }

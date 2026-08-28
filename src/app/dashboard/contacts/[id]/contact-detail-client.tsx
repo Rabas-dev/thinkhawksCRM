@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Phone,
@@ -19,11 +19,13 @@ import {
   MapPin,
   Link as LinkIcon,
   Ban,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Card, Badge } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
+import { EditContactDrawer } from "@/components/edit-contact-drawer";
 import { cn, formatDuration } from "@/lib/utils";
 import { useDialer } from "@/lib/dialer-context";
 import { MeetingDialog } from "@/components/meeting-dialog";
@@ -93,6 +95,7 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
   const [followUpDate, setFollowUpDate] = useState("");
   const [addingFollowUp, setAddingFollowUp] = useState(false);
   const [meetingDialogOpen, setMeetingDialogOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const [channel, setChannel] = useState<"email" | MessageChannel>(detail.contact.phone ? "sms" : "email");
   const [subject, setSubject] = useState("");
@@ -363,12 +366,20 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
               )}
             </div>
           </div>
-          <button
-            onClick={deleteContact}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger cursor-pointer"
-          >
-            <Trash2 size={15} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setEditOpen(true)}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-ink/5 hover:text-ink cursor-pointer"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={deleteContact}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger cursor-pointer"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
         </div>
 
         <div>
@@ -539,6 +550,8 @@ export function ContactDetailClient({ contacts, detail }: { contacts: ContactRow
         contact={{ id: contact.id, full_name: contact.full_name, email: contact.email, company: contact.company }}
         onBooked={refresh}
       />
+
+      <EditContactDrawer open={editOpen} onClose={() => setEditOpen(false)} contact={contact} onSaved={refresh} />
     </div>
   );
 }
