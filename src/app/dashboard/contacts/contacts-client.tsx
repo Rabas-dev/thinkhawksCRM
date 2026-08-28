@@ -160,7 +160,7 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
               <th className="border-b border-border px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted">
                 Tags
               </th>
-              <th className="w-10 border-b border-border px-3 py-2.5" />
+              <th className="w-16 border-b border-border px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
@@ -217,9 +217,9 @@ export function ContactsClient({ initialContacts }: { initialContacts: Contact[]
                   <td className="border-b border-border px-3 py-2.5">
                     <button
                       onClick={() => setEditingContact(c)}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg text-muted opacity-0 group-hover:opacity-100 hover:bg-ink/5 hover:text-ink cursor-pointer"
+                      className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs font-medium text-ink hover:bg-ink/5 cursor-pointer"
                     >
-                      <Pencil size={13} />
+                      <Pencil size={12} /> Edit
                     </button>
                   </td>
                 </tr>
