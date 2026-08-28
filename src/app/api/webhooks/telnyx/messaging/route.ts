@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireWebhookToken } from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
+import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 
 /**
  * Single webhook URL for every Messaging event (configured once, on the
@@ -16,10 +17,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const event = body?.data;
   const eventType: string | undefined = event?.event_type;
+  const eventId: string | undefined = event?.id;
   const payload = event?.payload;
   if (!eventType || !payload) return NextResponse.json({ ok: true });
 
   const supabase = createServiceClient();
+
+  if (!(await claimWebhookEvent(supabase, eventId, "telnyx_messaging"))) {
+    return NextResponse.json({ ok: true, deduped: true });
+  }
 
   if (eventType === "message.received") {
     const from = payload.from?.phone_number as string | undefined;

@@ -188,6 +188,21 @@ export async function bridgeCalls(callControlIdA: string, callControlIdB: string
 }
 
 /**
+ * Blind-transfers the other party on a call to a new number. `callControlId`
+ * must be *their* leg, not the agent's — for an inbound call that's the
+ * caller's own telnyx_call_control_id (stored on the calls row at
+ * call.initiated); for an outbound call it's the callee's, same field.
+ * Telnyx dials `to` and bridges that leg to it, dropping whatever this leg
+ * was previously bridged to (the agent's browser) automatically.
+ */
+export async function transferCall(callControlId: string, to: string) {
+  await telnyxRequest(`/calls/${callControlId}/actions/transfer`, {
+    method: "POST",
+    body: { to, from: TELNYX_NUMBER || undefined },
+  });
+}
+
+/**
  * Plays ringback tone to the caller. Telnyx does not generate this
  * automatically once a call is under Call Control (which every inbound call
  * here is, per the webhook on the Credential Connection) — without this the

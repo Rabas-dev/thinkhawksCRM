@@ -388,3 +388,19 @@ create policy "own settings only" on user_settings
 -- the files themselves pass straight through to SendGrid at send time and
 -- aren't stored, so this isn't re-downloadable from the CRM later).
 alter table emails add column if not exists attachments jsonb not null default '[]';
+
+-- Webhook idempotency: Telnyx (and SendGrid) retry a webhook delivery that
+-- didn't get a fast 2xx back — on Hostinger's cold-starting host that's a
+-- real, observed risk (see the Telnyx call audit). The unique constraint on
+-- event_id is the actual guard; a handler inserts here first and bails out
+-- on a conflict instead of reprocessing.
+create table if not exists processed_webhook_events (
+  event_id text primary key,
+  source text not null,
+  created_at timestamptz not null default now()
+);
+alter table processed_webhook_events enable row level security;
+drop policy if exists "service role only" on processed_webhook_events;
+create policy "service role only" on processed_webhook_events
+  for all using (auth.role() = 'service_role') with check (auth.role() = 'service_role');
+create index if not exists processed_webhook_events_created_idx on processed_webhook_events (created_at);

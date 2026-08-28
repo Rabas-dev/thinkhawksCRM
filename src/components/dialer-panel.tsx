@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Phone, PhoneOff, Mic, MicOff, Pause, Play, Circle, Delete, User } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Pause, Play, Circle, Delete, User, PhoneForwarded } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { cn, formatDuration } from "@/lib/utils";
@@ -61,6 +61,7 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
     toggleRecording,
     sendDigits,
     finishWrapUp,
+    transferCall,
   } = useDialer();
 
   const [number, setNumber] = useState("");
@@ -70,6 +71,10 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
   const [followUp, setFollowUp] = useState<(typeof FOLLOW_UPS)[number]>(FOLLOW_UPS[0]);
   const [customDate, setCustomDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferTo, setTransferTo] = useState("");
+  const [transferring, setTransferring] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   const wrapUpContactId = target?.contactId ?? null;
 
@@ -88,7 +93,28 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
       setFollowUp(FOLLOW_UPS[0]);
       setCustomDate("");
     }
+    if (callState !== "in-call") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- collapse the transfer form once the call it applied to has ended
+      setTransferOpen(false);
+      setTransferTo("");
+      setTransferError(null);
+    }
   }, [callState]);
+
+  async function submitTransfer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!transferTo.trim()) return;
+    setTransferring(true);
+    setTransferError(null);
+    const result = await transferCall(transferTo.trim());
+    setTransferring(false);
+    if (!result.ok) {
+      setTransferError(result.error ?? "Couldn't transfer the call");
+      return;
+    }
+    setTransferOpen(false);
+    setTransferTo("");
+  }
 
   async function saveDisposition() {
     setSaving(true);
@@ -299,6 +325,19 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
               </button>
             )}
 
+            {callState === "in-call" && (
+              <button
+                onClick={() => setTransferOpen((v) => !v)}
+                title="Transfer call"
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center rounded-full cursor-pointer",
+                  transferOpen ? "bg-primary/15 text-primary-dark" : "bg-section text-secondary",
+                )}
+              >
+                <PhoneForwarded size={17} />
+              </button>
+            )}
+
             {callState === "idle" || callState === "error" ? (
               <button
                 onClick={() => placeCall(number)}
@@ -319,6 +358,22 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
               </button>
             )}
           </div>
+
+          {callState === "in-call" && transferOpen && (
+            <form onSubmit={submitTransfer} className="mt-3 flex gap-2">
+              <Input
+                autoFocus
+                value={transferTo}
+                onChange={(e) => setTransferTo(e.target.value)}
+                placeholder="Transfer to +1 555 123 4567"
+                disabled={transferring}
+              />
+              <Button type="submit" size="sm" disabled={transferring || !transferTo.trim()}>
+                {transferring ? "…" : "Transfer"}
+              </Button>
+            </form>
+          )}
+          {transferError && <p className="mt-1.5 text-center text-xs text-danger">{transferError}</p>}
 
           {(callState === "in-call" || callState === "ringing" || callState === "connecting") && (
             <p className="mt-3 text-center text-sm text-muted">

@@ -54,6 +54,7 @@ type DialerContextValue = {
   toggleRecording: () => Promise<void>;
   sendDigits: (digit: string) => void;
   finishWrapUp: () => void;
+  transferCall: (to: string) => Promise<{ ok: boolean; error?: string }>;
 };
 
 const DialerContext = createContext<DialerContextValue | null>(null);
@@ -448,6 +449,23 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   const sendDigits = useCallback((digit: string) => callRef.current?.dtmf(digit), []);
 
+  const transferCall = useCallback(async (to: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!callRowId) return { ok: false, error: "No active call to transfer" };
+    const res = await fetch(`/api/calls/${callRowId}/transfer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { ok: false, error: data.error || "Couldn't transfer the call" };
+    }
+    // Telnyx drops our leg automatically once the transferred party is
+    // bridged to the new destination — the SDK's own hangup/destroy event
+    // (handleCallUpdate's "hangup"/"destroy" case) takes it from here.
+    return { ok: true };
+  }, [callRowId]);
+
   const finishWrapUp = useCallback(() => {
     setCallState("idle");
     setDuration(0);
@@ -490,6 +508,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       toggleRecording,
       sendDigits,
       finishWrapUp,
+      transferCall,
     }),
     [
       target,
@@ -517,6 +536,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       toggleRecording,
       sendDigits,
       finishWrapUp,
+      transferCall,
     ],
   );
 

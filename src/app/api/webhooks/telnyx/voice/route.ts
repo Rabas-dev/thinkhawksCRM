@@ -11,6 +11,7 @@ import {
   TELNYX_NUMBER,
 } from "@/lib/telnyx";
 import { createServiceClient } from "@/lib/supabase/server";
+import { claimWebhookEvent } from "@/lib/webhook-idempotency";
 import type { CallStatus } from "@/lib/types";
 
 function mapHangupStatus(cause: string | undefined): CallStatus {
@@ -71,11 +72,19 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const event = body?.data;
   const eventType: string | undefined = event?.event_type;
+  const eventId: string | undefined = event?.id;
   const payload = event?.payload;
   const occurredAt: string | undefined = event?.occurred_at;
   if (!eventType || !payload) return NextResponse.json({ ok: true });
 
   const supabase = createServiceClient();
+
+  // A retried delivery of an event we've already processed (Telnyx retries
+  // on a slow/non-2xx response) must not re-run side effects like dialing a
+  // second bridge leg or inserting a second `calls` row.
+  if (!(await claimWebhookEvent(supabase, eventId, "telnyx_voice"))) {
+    return NextResponse.json({ ok: true, deduped: true });
+  }
 
   switch (eventType) {
     case "call.initiated": {
