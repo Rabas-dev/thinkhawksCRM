@@ -611,10 +611,6 @@ function ComposeDialog({
 
       <div className="mt-4 border-t border-border pt-4">
         <Label>Someone new</Label>
-        <p className="mb-2 text-xs text-muted">
-          Either way, this email is recorded in Email → All sent. Choose whether the recipient also gets added to
-          Contacts.
-        </p>
         <div className="mb-2 flex gap-2">
           {(["contact", "quick"] as const).map((m) => (
             <button
