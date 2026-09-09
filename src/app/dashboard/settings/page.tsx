@@ -21,6 +21,12 @@ export default async function SettingsPage() {
     .eq("id", true)
     .maybeSingle();
 
+  const { data: senders } = await supabase
+    .from("email_senders")
+    .select("id, email, display_name, is_default")
+    .order("is_default", { ascending: false })
+    .order("display_name", { ascending: true });
+
   return (
     <SettingsClient
       userEmail={user?.email ?? null}
@@ -28,6 +34,7 @@ export default async function SettingsPage() {
         settings ?? { display_name: null, email_signature: null, default_caller_id: "main" as const }
       }
       initialCallRouting={callRouting ?? { inbound_ring_strategy: "ring-all" as const }}
+      initialSenders={senders ?? []}
     />
   );
 }

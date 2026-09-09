@@ -3,13 +3,13 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import {
   getSendgrid,
-  EMAIL_FROM,
   wrapEmailHtml,
   isSendgridConfigError,
   sendgridErrorMessage,
   firstSendgridHeader,
   DELIVERABILITY_TRACKING_SETTINGS,
 } from "@/lib/sendgrid";
+import { resolveSender } from "@/lib/email-senders";
 
 const attachmentSchema = z.object({
   filename: z.string().min(1).max(255),
@@ -37,6 +37,7 @@ const schema = z.union([
     subject: z.string().min(1),
     body: z.string().min(1),
     from_name: fromNameSchema.optional(),
+    from_email: z.string().email().optional(),
     attachments: attachmentsField,
   }),
   // A quick send to someone who isn't (and won't become) a saved contact —
@@ -47,6 +48,7 @@ const schema = z.union([
     subject: z.string().min(1),
     body: z.string().min(1),
     from_name: fromNameSchema.optional(),
+    from_email: z.string().email().optional(),
     attachments: attachmentsField,
   }),
 ]);
@@ -64,7 +66,14 @@ export async function POST(request: NextRequest) {
   }
   const { subject, body } = parsed.data;
   const attachments = parsed.data.attachments ?? [];
-  const fromName = parsed.data.from_name || "Think Hawks";
+
+  let sender;
+  try {
+    sender = await resolveSender(supabase, { email: parsed.data.from_email });
+  } catch {
+    return NextResponse.json({ error: "That sender address isn't on the approved list." }, { status: 400 });
+  }
+  const fromName = parsed.data.from_name || sender.display_name;
 
   let contact_id: string | null = null;
   let toEmail: string;
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
   try {
     const sgMail = getSendgrid();
     const [response] = await sgMail.send({
-      from: { email: EMAIL_FROM, name: fromName },
+      from: { email: sender.email, name: fromName },
       to: toEmail,
       subject,
       html,
@@ -132,7 +141,7 @@ export async function POST(request: NextRequest) {
     contact_id,
     direction: "outbound",
     resend_email_id: messageId,
-    from_address: EMAIL_FROM,
+    from_address: sender.email,
     to_address: toEmail,
     subject,
     text_body: body,

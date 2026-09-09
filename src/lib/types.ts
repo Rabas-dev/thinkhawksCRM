@@ -64,6 +64,7 @@ export type Campaign = {
   body: string;
   template_id: string | null;
   segment_tag: string | null;
+  sender_id: string | null;
   status: CampaignStatus;
   created_at: string;
   updated_at: string;

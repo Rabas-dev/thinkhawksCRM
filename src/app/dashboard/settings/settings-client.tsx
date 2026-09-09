@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Star, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
@@ -31,14 +31,23 @@ const RING_STRATEGY_OPTIONS: { value: CallRouting["inbound_ring_strategy"]; labe
   },
 ];
 
+type EmailSender = {
+  id: string;
+  email: string;
+  display_name: string;
+  is_default: boolean;
+};
+
 export function SettingsClient({
   userEmail,
   initialSettings,
   initialCallRouting,
+  initialSenders,
 }: {
   userEmail: string | null;
   initialSettings: Settings;
   initialCallRouting: CallRouting;
+  initialSenders: EmailSender[];
 }) {
   const [displayName, setDisplayName] = useState(initialSettings.display_name ?? "");
   const [signature, setSignature] = useState(initialSettings.email_signature ?? "");
@@ -49,6 +58,12 @@ export function SettingsClient({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [senders, setSenders] = useState<EmailSender[]>(initialSenders);
+  const [newSenderEmail, setNewSenderEmail] = useState("");
+  const [newSenderName, setNewSenderName] = useState("");
+  const [sendersBusy, setSendersBusy] = useState(false);
+  const [sendersError, setSendersError] = useState<string | null>(null);
 
   async function save(patch: Partial<Settings>) {
     setSaving(true);
@@ -83,6 +98,56 @@ export function SettingsClient({
       setRingStrategy(previous);
       setRoutingError("Couldn't save that — try again.");
     }
+  }
+
+  async function addSender(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newSenderEmail.trim() || !newSenderName.trim()) return;
+    setSendersBusy(true);
+    setSendersError(null);
+    const res = await fetch("/api/email/senders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: newSenderEmail.trim(), display_name: newSenderName.trim() }),
+    });
+    const data = await res.json();
+    setSendersBusy(false);
+    if (!res.ok) {
+      setSendersError(data.error?.formErrors?.join(", ") ?? data.error ?? "Couldn't add that sender.");
+      return;
+    }
+    setSenders((prev) => [...prev, data.sender].sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : a.display_name.localeCompare(b.display_name))));
+    setNewSenderEmail("");
+    setNewSenderName("");
+  }
+
+  async function setDefaultSender(id: string) {
+    setSendersBusy(true);
+    setSendersError(null);
+    const res = await fetch("/api/email/senders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setSendersBusy(false);
+    if (!res.ok) {
+      setSendersError("Couldn't set that as default — try again.");
+      return;
+    }
+    setSenders((prev) => prev.map((s) => ({ ...s, is_default: s.id === id })).sort((a, b) => (a.is_default ? -1 : b.is_default ? 1 : a.display_name.localeCompare(b.display_name))));
+  }
+
+  async function deleteSender(id: string) {
+    setSendersBusy(true);
+    setSendersError(null);
+    const res = await fetch(`/api/email/senders?id=${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    setSendersBusy(false);
+    if (!res.ok) {
+      setSendersError(data.error ?? "Couldn't remove that sender.");
+      return;
+    }
+    setSenders((prev) => prev.filter((s) => s.id !== id));
   }
 
   return (
@@ -171,6 +236,71 @@ export function SettingsClient({
           ))}
         </div>
         {routingError && <p className="mt-2 text-xs font-medium text-danger">{routingError}</p>}
+      </Card>
+
+      <Card className="mt-6 px-5 py-4">
+        <p className="text-sm text-ink">Email senders</p>
+        <p className="mb-3 text-xs text-muted">
+          Addresses emails can be sent from — every address must already be on a domain you&apos;ve authenticated in
+          SendGrid, since this is what actually goes in the &quot;From&quot; header
+        </p>
+        <div className="divide-y divide-border rounded-lg border border-border">
+          {senders.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-muted">No senders yet — add one below.</p>
+          ) : (
+            senders.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-ink">
+                    {s.display_name} <span className="text-muted">&lt;{s.email}&gt;</span>
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {s.is_default ? (
+                    <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary-dark">
+                      <Star size={11} fill="currentColor" /> Default
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={sendersBusy}
+                      onClick={() => setDefaultSender(s.id)}
+                      className="rounded-full px-2 py-0.5 text-[11px] font-medium text-muted hover:bg-section cursor-pointer"
+                    >
+                      Set default
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={sendersBusy || s.is_default}
+                    title={s.is_default ? "Set another sender as default first" : "Remove"}
+                    onClick={() => deleteSender(s.id)}
+                    className="rounded-lg p-1.5 text-muted hover:bg-section hover:text-danger disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted cursor-pointer"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        <form onSubmit={addSender} className="mt-3 flex gap-2">
+          <Input
+            type="email"
+            placeholder="sales@thinkhawks.com"
+            value={newSenderEmail}
+            onChange={(e) => setNewSenderEmail(e.target.value)}
+          />
+          <Input
+            placeholder="Sales Team"
+            value={newSenderName}
+            onChange={(e) => setNewSenderName(e.target.value)}
+          />
+          <Button type="submit" variant="secondary" disabled={sendersBusy || !newSenderEmail.trim() || !newSenderName.trim()}>
+            Add
+          </Button>
+        </form>
+        {sendersError && <p className="mt-2 text-xs font-medium text-danger">{sendersError}</p>}
       </Card>
 
       <Card className="mt-6 px-5 py-4">

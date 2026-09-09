@@ -197,6 +197,31 @@ create table if not exists email_templates (
   updated_at timestamptz not null default now()
 );
 
+-- ─── Email sending identities (multiple "From" addresses) ──────────────────
+-- An allowlist, not free text: SendGrid will happily send From any address
+-- on a domain you've authenticated (Settings > Sender Authentication in
+-- SendGrid — thinkhawks.com already is, see sendgrid.ts), so nothing at the
+-- API layer stops a typo or a malicious actor from sending as an address
+-- nobody actually owns/monitors. Restricting sends to rows in this table
+-- (src/lib/email-senders.ts) is what closes that gap.
+
+create table if not exists email_senders (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  display_name text not null,
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table email_senders enable row level security;
+drop policy if exists "authenticated full access" on email_senders;
+create policy "authenticated full access" on email_senders
+  for all to authenticated using (true) with check (true);
+
+insert into email_senders (email, display_name, is_default)
+values ('crm@thinkhawks.com', 'Think Hawks', true)
+on conflict (email) do nothing;
+
 create table if not exists campaigns (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -209,6 +234,10 @@ create table if not exists campaigns (
   updated_at timestamptz not null default now(),
   sent_at timestamptz
 );
+
+-- Which email_senders row a campaign sends from — null means "whichever is
+-- marked default at send time" (src/lib/email-senders.ts resolveSender).
+alter table campaigns add column if not exists sender_id uuid references email_senders (id) on delete set null;
 
 create table if not exists campaign_recipients (
   id uuid primary key default gen_random_uuid(),

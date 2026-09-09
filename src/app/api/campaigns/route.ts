@@ -10,6 +10,7 @@ const createSchema = z.object({
   body: z.string().min(1),
   template_id: z.string().uuid().optional().nullable(),
   segment_tag: z.string().optional().nullable(),
+  sender_id: z.string().uuid().optional().nullable(),
 });
 
 export async function GET() {

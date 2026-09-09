@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   getSendgrid,
-  EMAIL_FROM,
   wrapEmailHtml,
   isSendgridConfigError,
   firstSendgridHeader,
   DELIVERABILITY_TRACKING_SETTINGS,
 } from "@/lib/sendgrid";
+import { resolveSender } from "@/lib/email-senders";
 import { renderTemplate } from "@/lib/templates";
 
 // A large audience sends in sequential batches of CHUNK_SIZE — give this
@@ -69,6 +69,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   }
 
   const recipientByContact = new Map(recipientRows.map((r) => [r.contact_id, r]));
+  const sender = await resolveSender(supabase, { id: campaign.sender_id });
 
   let sgMail;
   try {
@@ -94,7 +95,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       batch.map((contact) => {
         const text = renderTemplate(campaign.body, contact);
         return sgMail.send({
-          from: EMAIL_FROM,
+          from: { email: sender.email, name: sender.display_name },
           to: contact.email!,
           subject: renderTemplate(campaign.subject, contact),
           html: wrapEmailHtml(text),

@@ -10,6 +10,8 @@ import { sendEmail } from "@/lib/send-email";
 import { renderTemplate } from "@/lib/templates";
 import type { Contact, EmailTemplate } from "@/lib/types";
 
+type EmailSender = { id: string; email: string; display_name: string; is_default: boolean };
+
 export function EmailDialog({
   open,
   onClose,
@@ -31,6 +33,8 @@ export function EmailDialog({
   const [body, setBody] = useState("");
   const [signature, setSignature] = useState("");
   const [fromName, setFromName] = useState("");
+  const [senders, setSenders] = useState<EmailSender[]>([]);
+  const [senderEmail, setSenderEmail] = useState("");
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +55,14 @@ export function EmailDialog({
         // eslint-disable-next-line react-hooks/set-state-in-effect -- prefill the visible sender name from the agent's Settings default
         setFromName((current) => current || d.settings?.display_name?.trim() || "");
       });
+    fetch("/api/email/senders")
+      .then((r) => r.json())
+      .then((d) => {
+        const list: EmailSender[] = d.senders ?? [];
+        setSenders(list);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- default the picker to whichever sender is marked default
+        setSenderEmail((current) => current || list.find((s) => s.is_default)?.email || list[0]?.email || "");
+      });
   }, [open]);
 
   function applyTemplate(id: string) {
@@ -65,7 +77,14 @@ export function EmailDialog({
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await sendEmail({ contact_id: contactId, subject, body, from_name: fromName, attachments });
+    const result = await sendEmail({
+      contact_id: contactId,
+      subject,
+      body,
+      from_name: fromName,
+      from_email: senderEmail || undefined,
+      attachments,
+    });
     setLoading(false);
     if (!result.ok) {
       setError(result.error);
@@ -92,14 +111,30 @@ export function EmailDialog({
           <Label>To</Label>
           <Input value={contactEmail ?? "No email on file"} disabled />
         </div>
-        <div>
-          <Label>Show as sender</Label>
-          <Input
-            value={fromName}
-            onChange={(e) => setFromName(e.target.value)}
-            placeholder="Your name"
-            maxLength={100}
-          />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label>Send from</Label>
+            <select
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              {senders.map((s) => (
+                <option key={s.id} value={s.email}>
+                  {s.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label>Show as sender</Label>
+            <Input
+              value={fromName}
+              onChange={(e) => setFromName(e.target.value)}
+              placeholder="Your name"
+              maxLength={100}
+            />
+          </div>
         </div>
         {templates.length > 0 && (
           <div>

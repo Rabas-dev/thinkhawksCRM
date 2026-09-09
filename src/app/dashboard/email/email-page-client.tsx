@@ -15,6 +15,8 @@ import { sendEmail } from "@/lib/send-email";
 import { renderTemplate } from "@/lib/templates";
 import type { Email, EmailEvent, EmailTemplate, Contact } from "@/lib/types";
 
+type EmailSender = { id: string; email: string; display_name: string; is_default: boolean };
+
 type EmailSummary = {
   subject: string | null;
   text_body: string | null;
@@ -115,6 +117,8 @@ export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarR
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [fromName, setFromName] = useState("");
+  const [senders, setSenders] = useState<EmailSender[]>([]);
+  const [senderEmail, setSenderEmail] = useState("");
 
   useEffect(() => {
     fetch("/api/email/templates")
@@ -123,6 +127,13 @@ export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarR
     fetch("/api/settings")
       .then((r) => r.json())
       .then((d) => setFromName(d.settings?.display_name?.trim() || ""));
+    fetch("/api/email/senders")
+      .then((r) => r.json())
+      .then((d) => {
+        const list: EmailSender[] = d.senders ?? [];
+        setSenders(list);
+        setSenderEmail(list.find((s) => s.is_default)?.email || list[0]?.email || "");
+      });
   }, []);
 
   const loadThread = useCallback(async (contactId: string) => {
@@ -181,8 +192,8 @@ export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarR
     setError(null);
     const result = await sendEmail(
       selectedId
-        ? { contact_id: selectedId, subject, body, from_name: fromName, attachments }
-        : { to: quickTo, subject, body, from_name: fromName, attachments },
+        ? { contact_id: selectedId, subject, body, from_name: fromName, from_email: senderEmail || undefined, attachments }
+        : { to: quickTo, subject, body, from_name: fromName, from_email: senderEmail || undefined, attachments },
     );
     setSending(false);
     if (!result.ok) {
@@ -410,13 +421,26 @@ export function EmailPageClient({ rows: sidebarRows, sentLog }: { rows: SidebarR
                 placeholder="Subject"
                 className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <input
-                value={fromName}
-                onChange={(e) => setFromName(e.target.value)}
-                placeholder="Show as sender (your name)"
-                maxLength={100}
-                className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={senderEmail}
+                  onChange={(e) => setSenderEmail(e.target.value)}
+                  className="h-9 w-1/2 rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  {senders.map((s) => (
+                    <option key={s.id} value={s.email}>
+                      {s.email}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={fromName}
+                  onChange={(e) => setFromName(e.target.value)}
+                  placeholder="Show as sender (your name)"
+                  maxLength={100}
+                  className="h-9 w-1/2 rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </div>
               <AttachmentChips attachments={attachments} onChange={setAttachments} error={attachError} />
               <div className="flex gap-2">
                 <textarea

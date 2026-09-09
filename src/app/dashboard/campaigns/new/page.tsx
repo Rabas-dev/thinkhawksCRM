@@ -8,15 +8,19 @@ import { Input, Label, Textarea } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import type { EmailTemplate } from "@/lib/types";
 
+type EmailSender = { id: string; email: string; display_name: string; is_default: boolean };
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [senders, setSenders] = useState<EmailSender[]>([]);
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [segmentTag, setSegmentTag] = useState("");
+  const [senderId, setSenderId] = useState("");
   const [saving, setSaving] = useState<"draft" | "send" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +31,13 @@ export default function NewCampaignPage() {
     fetch("/api/contacts/tags")
       .then((r) => r.json())
       .then((d) => setTags(d.tags ?? []));
+    fetch("/api/email/senders")
+      .then((r) => r.json())
+      .then((d) => {
+        const list: EmailSender[] = d.senders ?? [];
+        setSenders(list);
+        setSenderId(list.find((s) => s.is_default)?.id || list[0]?.id || "");
+      });
   }, []);
 
   function applyTemplate(id: string) {
@@ -51,6 +62,7 @@ export default function NewCampaignPage() {
         body,
         template_id: templateId || null,
         segment_tag: segmentTag || null,
+        sender_id: senderId || null,
       }),
     });
     const data = await res.json();
@@ -125,6 +137,24 @@ export default function NewCampaignPage() {
               ))}
             </select>
           </div>
+        </div>
+
+        <div>
+          <Label>Send from</Label>
+          <select
+            value={senderId}
+            onChange={(e) => setSenderId(e.target.value)}
+            className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            {senders.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.display_name} &lt;{s.email}&gt;
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-muted">
+            Manage the list of approved sender addresses in Settings.
+          </p>
         </div>
 
         <div>
