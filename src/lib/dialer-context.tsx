@@ -31,6 +31,10 @@ export type RecordingState = "recording" | "paused" | "stopped";
 type DialerContextValue = {
   target: DialerTarget | null;
   isOpen: boolean;
+  /** True once the agent has explicitly minimized an active call's full-screen overlay down to the corner bubble. Reset to false whenever a new call starts, so every call opens full-screen first. */
+  isMinimized: boolean;
+  minimizeCall: () => void;
+  expandCall: () => void;
   callState: DialerCallState;
   incoming: IncomingInfo | null;
   duration: number;
@@ -74,6 +78,18 @@ function releaseCredentialFetch(credentialId: string) {
   }).catch(() => {});
 }
 
+const HEARTBEAT_INTERVAL_MS = 20_000;
+
+/**
+ * Keeps dialer_sessions.updated_at fresh while this session is actually
+ * connected, so the inbound voice webhook can tell it apart from a stale row
+ * left behind by a crashed/force-closed tab (which only the pagehide DELETE
+ * or the 4h GC would otherwise clear) — see the route's PATCH handler.
+ */
+function heartbeatFetch(credentialId: string) {
+  fetch(`/api/calls/token?credentialId=${encodeURIComponent(credentialId)}`, { method: "PATCH" }).catch(() => {});
+}
+
 function readCallerId(call: TelnyxCall): IncomingInfo {
   const options = (call as unknown as { options?: Record<string, unknown> }).options ?? {};
   const number =
@@ -89,6 +105,7 @@ function readCallerId(call: TelnyxCall): IncomingInfo {
 
 export function DialerProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [target, setTarget] = useState<DialerTarget | null>(null);
   const [callState, setCallState] = useState<DialerCallState>("idle");
   const [incoming, setIncoming] = useState<IncomingInfo | null>(null);
@@ -127,6 +144,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     useTestCallerIdRef.current = useTestCallerId;
   }, [useTestCallerId]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const targetRef = useRef<DialerTarget | null>(null);
   const callStateRef = useRef<DialerCallState>(callState);
   const connectionStatusRef = useRef<ConnectionStatus>(connectionStatus);
@@ -190,6 +208,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
             setError(null);
             setCallState("incoming");
             setIsOpen(true);
+            // Every new call opens full-screen first, like a phone's own
+            // incoming-call screen — the agent minimizes explicitly if they
+            // want to keep working elsewhere while it rings/connects.
+            setIsMinimized(false);
             const sessionId = call.telnyxIDs?.telnyxSessionId;
             if (sessionId) resolveInboundCallRow(sessionId);
           } else {
@@ -281,8 +303,24 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     client.on("telnyx.ready", () => {
       setConnectionStatus("connected");
       setError(null);
+      const id = credentialIdRef.current;
+      if (id && !heartbeatRef.current) {
+        heartbeatFetch(id);
+        heartbeatRef.current = setInterval(() => {
+          if (credentialIdRef.current) heartbeatFetch(credentialIdRef.current);
+        }, HEARTBEAT_INTERVAL_MS);
+      }
     });
-    client.on("telnyx.socket.close", () => setConnectionStatus("disconnected"));
+    client.on("telnyx.socket.close", () => {
+      setConnectionStatus("disconnected");
+      // Stop pinging while disconnected — the SDK reconnects on its own and
+      // fires telnyx.ready again, which restarts the heartbeat. A session
+      // that isn't reconnecting shouldn't keep looking "live" to the webhook.
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    });
     // The SDK reconnects on its own (IClientOptions has no opt-out we need
     // here) — this is just a status flag, not something we retry ourselves.
     client.on("telnyx.error", (event: { error?: { message?: string; description?: string; solutions?: string[] } }) => {
@@ -313,13 +351,21 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     window.addEventListener("pagehide", releaseCredential);
     return () => {
       window.removeEventListener("pagehide", releaseCredential);
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
       clientRef.current?.disconnect();
       clientRef.current = null;
       releaseCredential();
     };
   }, [getClient, releaseCredential]);
 
+  const minimizeCall = useCallback(() => setIsMinimized(true), []);
+  const expandCall = useCallback(() => setIsMinimized(false), []);
+
   const openDialer = useCallback((number?: string, contactId?: string, contactName?: string) => {
+    setIsMinimized(false);
     setTarget(number ? { number, contactId, contactName } : null);
     setError(null);
     setIsOpen(true);
@@ -350,6 +396,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     setRecordingState("stopped");
     setCallState("idle");
     setIsOpen(false);
+    setIsMinimized(false);
     setDuration(0);
     setCallRowId(null);
     setIncoming(null);
@@ -361,6 +408,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       setError(null);
       setCallState("connecting");
       setCallRowId(null);
+      setIsMinimized(false);
 
       const contactId = targetRef.current?.contactId;
       const res = await fetch("/api/calls/start", {
@@ -407,6 +455,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     callRef.current?.hangup();
     setCallState("idle");
     setIsOpen(false);
+    setIsMinimized(false);
     setIncoming(null);
   }, []);
   const hangUp = useCallback(() => {
@@ -472,6 +521,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     setCallRowId(null);
     setIncoming(null);
     setIsOpen(false);
+    setIsMinimized(false);
   }, []);
 
   useEffect(() => stopTimer, [stopTimer]);
@@ -485,6 +535,9 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     () => ({
       target,
       isOpen,
+      isMinimized,
+      minimizeCall,
+      expandCall,
       callState,
       incoming,
       duration,
@@ -513,6 +566,9 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     [
       target,
       isOpen,
+      isMinimized,
+      minimizeCall,
+      expandCall,
       callState,
       incoming,
       duration,

@@ -14,16 +14,38 @@ type Settings = {
   default_caller_id: "main" | "test";
 };
 
+type CallRouting = {
+  inbound_ring_strategy: "ring-all" | "round-robin";
+};
+
+const RING_STRATEGY_OPTIONS: { value: CallRouting["inbound_ring_strategy"]; label: string; description: string }[] = [
+  {
+    value: "ring-all",
+    label: "Ring all agents",
+    description: "Every connected agent's dialer rings at once. First to answer gets the call; the rest stop ringing.",
+  },
+  {
+    value: "round-robin",
+    label: "Round robin",
+    description: "Only the next agent in rotation rings. Spreads calls evenly, but a call is missed if that agent doesn't answer.",
+  },
+];
+
 export function SettingsClient({
   userEmail,
   initialSettings,
+  initialCallRouting,
 }: {
   userEmail: string | null;
   initialSettings: Settings;
+  initialCallRouting: CallRouting;
 }) {
   const [displayName, setDisplayName] = useState(initialSettings.display_name ?? "");
   const [signature, setSignature] = useState(initialSettings.email_signature ?? "");
   const [callerId, setCallerId] = useState<Settings["default_caller_id"]>(initialSettings.default_caller_id);
+  const [ringStrategy, setRingStrategy] = useState(initialCallRouting.inbound_ring_strategy);
+  const [routingSaving, setRoutingSaving] = useState(false);
+  const [routingError, setRoutingError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +66,23 @@ export function SettingsClient({
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function saveRingStrategy(next: CallRouting["inbound_ring_strategy"]) {
+    const previous = ringStrategy;
+    setRingStrategy(next);
+    setRoutingSaving(true);
+    setRoutingError(null);
+    const res = await fetch("/api/settings/call-routing", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inbound_ring_strategy: next }),
+    });
+    setRoutingSaving(false);
+    if (!res.ok) {
+      setRingStrategy(previous);
+      setRoutingError("Couldn't save that — try again.");
+    }
   }
 
   return (
@@ -105,6 +144,33 @@ export function SettingsClient({
             </button>
           ))}
         </div>
+      </Card>
+
+      <Card className="mt-6 px-5 py-4">
+        <p className="text-sm text-ink">Inbound call routing</p>
+        <p className="mb-3 text-xs text-muted">
+          How an incoming call picks which connected agent(s) to ring — applies to the whole team
+        </p>
+        <div className="flex flex-col gap-2">
+          {RING_STRATEGY_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              disabled={routingSaving}
+              onClick={() => saveRingStrategy(option.value)}
+              className={cn(
+                "rounded-lg border px-3 py-2 text-left text-sm transition",
+                ringStrategy === option.value
+                  ? "border-primary bg-primary/10 text-primary-dark"
+                  : "border-border bg-surface text-ink hover:bg-section",
+              )}
+            >
+              <span className="font-medium">{option.label}</span>
+              <p className="mt-0.5 text-xs text-muted">{option.description}</p>
+            </button>
+          ))}
+        </div>
+        {routingError && <p className="mt-2 text-xs font-medium text-danger">{routingError}</p>}
       </Card>
 
       <Card className="mt-6 px-5 py-4">

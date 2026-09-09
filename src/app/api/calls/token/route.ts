@@ -32,13 +32,15 @@ export async function GET() {
       .from("dialer_sessions")
       .insert({ credential_id: credentialId, sip_username: sipUsername, user_email: user.email ?? null });
     // Best-effort GC for rows a crashed/force-closed tab never got to DELETE
-    // (the pagehide handler can't fire for every ungraceful exit). Doesn't
-    // fully solve "is this session actually still alive" for inbound-call
-    // routing, but keeps genuinely abandoned rows from lingering indefinitely.
+    // (the pagehide handler can't fire for every ungraceful exit). The voice
+    // webhook already filters dead sessions out by updated_at when routing
+    // an inbound call (see its dialer_sessions query), so this is just
+    // housekeeping — stale rows can't misroute a call anymore, they just sit
+    // unused until this catches them.
     supabase
       .from("dialer_sessions")
       .delete()
-      .lt("created_at", new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
+      .lt("updated_at", new Date(Date.now() - 30 * 60 * 1000).toISOString())
       .then(() => {});
     const { data: settings } = await supabase
       .from("user_settings")
@@ -58,6 +60,29 @@ export async function GET() {
       { status: 503 },
     );
   }
+}
+
+/**
+ * Heartbeat from a connected browser dialer session, called every ~20s
+ * (src/lib/dialer-context.tsx) so `dialer_sessions.updated_at` reflects
+ * "still actually connected," not just "was created at some point." The
+ * inbound voice webhook only rings sessions updated recently — see the
+ * updated_at column comment in supabase/schema.sql for why.
+ */
+export async function PATCH(request: NextRequest) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const credentialId = request.nextUrl.searchParams.get("credentialId");
+  if (!credentialId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentialId)) {
+    return NextResponse.json({ error: "Invalid credentialId" }, { status: 400 });
+  }
+
+  await supabase.from("dialer_sessions").update({ updated_at: new Date().toISOString() }).eq("credential_id", credentialId);
+  return NextResponse.json({ ok: true });
 }
 
 /** Releases a session's Telephony Credential when the dialer disconnects (tab close/unmount) — keeps the account tidy. */

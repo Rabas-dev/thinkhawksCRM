@@ -91,6 +91,13 @@ alter table calls add column if not exists started_at timestamptz;
 -- in src/lib/telnyx.ts).
 alter table calls add column if not exists bridge_leg_call_control_id text;
 
+-- Superseded by bridge_leg_call_control_ids (plural) below — ring-all can
+-- have several bridge legs outstanding for one inbound call at once, which
+-- a single scalar column can't represent. The old column is left in place
+-- (unused going forward) rather than dropped, matching this file's
+-- additive-migration style; historical rows keep whatever they had.
+alter table calls add column if not exists bridge_leg_call_control_ids text[] not null default '{}';
+
 drop index if exists calls_sid_idx;
 create index if not exists calls_contact_idx on calls (contact_id, created_at desc);
 create unique index if not exists calls_session_idx on calls (telnyx_call_session_id);
@@ -113,6 +120,40 @@ create table if not exists dialer_sessions (
 alter table dialer_sessions enable row level security;
 drop policy if exists "authenticated full access" on dialer_sessions;
 create policy "authenticated full access" on dialer_sessions
+  for all to authenticated using (true) with check (true);
+
+-- Heartbeat column: the connected browser dialer pings this every ~20s
+-- (PATCH /api/calls/token) so the inbound voice webhook can tell "most
+-- recently created session" apart from "session that's actually still
+-- alive right now." Without it, a tab that closed without firing the
+-- pagehide DELETE (crash, force-quit, sleep, network drop) leaves a row
+-- that looks exactly as valid as a live one for up to the 4h GC window —
+-- and if it happens to be newer than a genuinely connected agent's row, the
+-- webhook dials a dead SIP endpoint and every inbound call times out
+-- unanswered. See src/app/api/webhooks/telnyx/voice/route.ts.
+alter table dialer_sessions add column if not exists updated_at timestamptz not null default now();
+
+-- ─── App-wide settings (singleton row) ──────────────────────────────────────
+-- Team-level config, as opposed to user_settings' per-agent preferences.
+-- Currently just how inbound calls pick which connected agent(s) to ring —
+-- see the voice webhook's call.initiated handler. The `id` check constraint
+-- keeps this at exactly one row (Postgres's usual singleton-table trick).
+
+create table if not exists app_settings (
+  id boolean primary key default true check (id),
+  inbound_ring_strategy text not null default 'ring-all' check (inbound_ring_strategy in ('ring-all', 'round-robin')),
+  -- Round-robin's rotation pointer: the credential_id of the dialer session
+  -- last rung, so the next inbound call knows to ring whoever's next in
+  -- line rather than the same agent every time.
+  round_robin_last_credential_id text,
+  updated_at timestamptz not null default now()
+);
+
+insert into app_settings (id) values (true) on conflict (id) do nothing;
+
+alter table app_settings enable row level security;
+drop policy if exists "authenticated full access" on app_settings;
+create policy "authenticated full access" on app_settings
   for all to authenticated using (true) with check (true);
 
 -- ─── Messaging (Telnyx SMS) ──────────────────────────────────────────────────

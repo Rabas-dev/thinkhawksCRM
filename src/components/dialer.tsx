@@ -1,22 +1,29 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { X } from "lucide-react";
+import { X, Maximize2 } from "lucide-react";
 import { formatDuration } from "@/lib/utils";
 import { useDialer } from "@/lib/dialer-context";
 import { DialerPanel } from "@/components/dialer-panel";
 
+const ACTIVE_STATES = new Set(["incoming", "connecting", "ringing", "in-call", "wrap-up"]);
+
 /**
- * Floating dial pad available anywhere in the CRM. Hidden on
- * /dashboard/dialer, which already shows a full-size DialerPanel — avoids
- * two sets of call controls fighting over the same active call.
+ * Floating dial pad available anywhere in the CRM. Doubles as the minimized
+ * view of an active call — CallOverlay (src/components/call-overlay.tsx)
+ * takes over full-screen the moment a call starts, and dropping back to this
+ * bubble is the explicit "let me keep working elsewhere" action, not the
+ * default. Hidden on /dashboard/dialer, which already shows a full-size
+ * DialerPanel — avoids two sets of call controls fighting over the same call.
  */
 export function Dialer() {
-  const { isOpen, target, callState, incoming, duration, closeDialer } = useDialer();
+  const { isOpen, isMinimized, expandCall, target, callState, incoming, duration, closeDialer } = useDialer();
   const pathname = usePathname();
 
   if (pathname?.startsWith("/dashboard/dialer")) return null;
   if (!isOpen) return null;
+  // The full-screen overlay owns this state unless the agent minimized it.
+  if (ACTIVE_STATES.has(callState) && !isMinimized) return null;
 
   const headerName =
     callState === "incoming"
@@ -36,11 +43,18 @@ export function Dialer() {
           )}
           {callState === "incoming" && <p className="text-[11px] text-white/70">Incoming call…</p>}
         </div>
-        {callState !== "incoming" && (
-          <button onClick={closeDialer} className="text-white/70 hover:text-white cursor-pointer">
-            <X size={16} />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {isMinimized && ACTIVE_STATES.has(callState) && (
+            <button onClick={expandCall} title="Back to full screen" className="text-white/70 hover:text-white cursor-pointer">
+              <Maximize2 size={14} />
+            </button>
+          )}
+          {callState !== "incoming" && (
+            <button onClick={closeDialer} className="text-white/70 hover:text-white cursor-pointer">
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-4">

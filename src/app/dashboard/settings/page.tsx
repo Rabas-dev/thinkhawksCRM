@@ -15,12 +15,19 @@ export default async function SettingsPage() {
         .maybeSingle()
     : { data: null };
 
+  const { data: callRouting } = await supabase
+    .from("app_settings")
+    .select("inbound_ring_strategy")
+    .eq("id", true)
+    .maybeSingle();
+
   return (
     <SettingsClient
       userEmail={user?.email ?? null}
       initialSettings={
         settings ?? { display_name: null, email_signature: null, default_caller_id: "main" as const }
       }
+      initialCallRouting={callRouting ?? { inbound_ring_strategy: "ring-all" as const }}
     />
   );
 }

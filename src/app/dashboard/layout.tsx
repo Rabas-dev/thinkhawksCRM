@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/sidebar";
 import { Dialer } from "@/components/dialer";
+import { CallOverlay } from "@/components/call-overlay";
 import { DialerProvider } from "@/lib/dialer-context";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <main className="flex-1 min-h-0 overflow-y-auto bg-section">{children}</main>
       </div>
       <Dialer />
+      <CallOverlay />
     </DialerProvider>
   );
 }
