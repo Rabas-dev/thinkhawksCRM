@@ -22,19 +22,26 @@ const ACTIVE_STATES = new Set(["incoming", "connecting", "ringing", "in-call", "
  * it would just be two full-screen call layers at once.
  */
 export function CallOverlay() {
-  const { isOpen, isMinimized, minimizeCall, callState, target, duration } = useDialer();
+  const { isOpen, isMinimized, minimizeCall, callState, target, incoming, duration } = useDialer();
   const pathname = usePathname();
 
   if (pathname?.startsWith("/dashboard/dialer")) return null;
   if (!isOpen || isMinimized || !ACTIVE_STATES.has(callState)) return null;
 
-  // DialerPanel renders its own caller-identity header for the "incoming"
-  // state (avatar, name, accept/decline) — showing this overlay's header too
-  // would just duplicate it, so this one covers every other active state.
-  const showHeader = callState !== "incoming";
-  const name = target?.contactName || target?.number || "Dialer";
-  const subtitle =
-    callState === "in-call"
+  const isIncoming = callState === "incoming";
+  // For an incoming call, a matched CRM contact's name is worth trusting
+  // over the carrier-supplied caller name (usually blank for real PSTN
+  // calls anyway) — target.contactName gets filled in shortly after ringing
+  // starts, once resolveInboundCallRow's lookup lands (dialer-context.tsx).
+  const name = isIncoming ? target?.contactName || incoming?.callerName || "Unknown caller" : target?.contactName || target?.number || "Dialer";
+  // The caller's raw number, shown big and on its own line — this is the
+  // one piece of identity that's *always* available (even with no CRM match
+  // and no carrier caller-name), so it needs to be impossible to miss here,
+  // not tucked into a small caption the way the compact bubble shows it.
+  const numberLine = isIncoming ? incoming?.callerNumber : null;
+  const subtitle = isIncoming
+    ? "Incoming call"
+    : callState === "in-call"
       ? formatDuration(duration)
       : callState === "ringing"
         ? "Ringing…"
@@ -58,18 +65,17 @@ export function CallOverlay() {
       </div>
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-10">
-        {showHeader && (
-          <div className="mb-8 flex flex-col items-center gap-3">
-            <Avatar name={name} size={88} className="text-3xl" />
-            <div className="text-center">
-              <p className="text-xl font-semibold text-white">{name}</p>
-              {subtitle && <p className="mt-1 text-sm text-white/60">{subtitle}</p>}
-            </div>
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <Avatar name={name} size={88} className="text-3xl" />
+          <div className="text-center">
+            <p className="text-xl font-semibold text-white">{name}</p>
+            {numberLine && <p className="mt-1 text-lg font-medium text-white/90">{numberLine}</p>}
+            {subtitle && <p className="mt-1 text-sm text-white/60">{subtitle}</p>}
           </div>
-        )}
+        </div>
 
         <div className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-2xl">
-          <DialerPanel size="large" />
+          <DialerPanel size="large" hideIncomingHeader={isIncoming} />
         </div>
       </div>
     </div>

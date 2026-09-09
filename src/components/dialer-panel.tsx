@@ -37,7 +37,16 @@ function followUpDueAt(choice: (typeof FOLLOW_UPS)[number], customDate: string):
  * (Dialer) and the full-size /dashboard/dialer workspace. Audio runs through
  * the browser's mic/speakers via Telnyx's WebRTC SDK (src/lib/dialer-context.tsx).
  */
-export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compact" | "large"; onWrapUpSaved?: () => void }) {
+export function DialerPanel({
+  size = "compact",
+  onWrapUpSaved,
+  hideIncomingHeader = false,
+}: {
+  size?: "compact" | "large";
+  onWrapUpSaved?: () => void;
+  /** Skip the built-in avatar/name/number chip for the "incoming" state — set by CallOverlay, which already shows a bigger version of the same identity above this panel. */
+  hideIncomingHeader?: boolean;
+}) {
   const {
     target,
     callState,
@@ -152,17 +161,22 @@ export function DialerPanel({ size = "compact", onWrapUpSaved }: { size?: "compa
     <div>
       {callState === "incoming" ? (
         <div className="space-y-3">
-          <div className={cn("flex items-center gap-3 rounded-lg bg-section", large ? "p-4" : "p-3")}>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary-dark">
-              <User size={18} />
+          {!hideIncomingHeader && (
+            <div className={cn("flex items-center gap-3 rounded-lg bg-section", large ? "p-4" : "p-3")}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary-dark">
+                <User size={18} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-secondary">
+                  {incoming?.callerName || incoming?.callerNumber || "Unknown caller"}
+                </p>
+                {/* Only worth a second line when it's not just repeating the name line above */}
+                {incoming?.callerName && incoming?.callerNumber && (
+                  <p className="truncate text-xs text-muted">{incoming.callerNumber}</p>
+                )}
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-secondary">
-                {incoming?.callerName || incoming?.callerNumber || "Unknown caller"}
-              </p>
-              {incoming?.callerNumber && <p className="truncate text-xs text-muted">{incoming.callerNumber}</p>}
-            </div>
-          </div>
+          )}
           <div className="flex items-center justify-center gap-4 pt-1">
             <button
               onClick={declineIncoming}
